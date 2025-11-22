@@ -3,6 +3,32 @@
 const pathParts = window.location.pathname.split('/').filter(p => p);
 const roomId = pathParts[pathParts.length - 1];
 
+// 獲取 base path（例如：/tinySecret/ 或 /）
+function getBasePath() {
+    const base = document.querySelector('base');
+    if (base) {
+        const href = base.getAttribute('href');
+        // 從完整 URL 中提取路徑部分
+        try {
+            const url = new URL(href, window.location.origin);
+            const path = url.pathname;
+            return path.endsWith('/') ? path : path + '/';
+        } catch (e) {
+            // 如果解析失敗，假設 href 已經是路徑
+            return href.endsWith('/') ? href : href + '/';
+        }
+    }
+    // 如果沒有 base tag，從 pathname 推斷
+    const path = window.location.pathname;
+    const parts = path.split('/').filter(p => p);
+    if (parts.length > 0) {
+        return '/' + parts[0] + '/';
+    }
+    return '/';
+}
+
+const basePath = getBasePath();
+
 // 檢查是創建者還是參與者
 // 必須同時滿足：1) role='creator' 2) 有對應的私鑰
 const role = localStorage.getItem(`tinySecret_room_${roomId}_role`);
@@ -47,7 +73,7 @@ async function initParticipant() {
         // 1. 獲取房間創建者的公鑰
         document.getElementById('statusText').textContent = '獲取房間資訊...';
         
-        const response = await fetch(`/api/room/${roomId}/creator-key`);
+        const response = await fetch(`${window.location.origin}${basePath}api/room/${roomId}/creator-key`);
         const { publicKey: creatorPublicKeyBase64 } = await response.json();
         const creatorPublicKey = await CryptoHelper.importPublicKey(creatorPublicKeyBase64);
         
@@ -72,7 +98,7 @@ async function initParticipant() {
         
         // 4. 加入房間（發送加密的公鑰）
         document.getElementById('statusText').textContent = '加入聊天室...';
-        const joinResponse = await fetch(`/api/room/${roomId}/join`, {
+        const joinResponse = await fetch(`${window.location.origin}${basePath}api/room/${roomId}/join`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -89,8 +115,9 @@ async function initParticipant() {
         localStorage.setItem(`tinySecret_chat_${roomId}_${participantId}_peerPublicKey`, creatorPublicKeyBase64);
         localStorage.setItem(`tinySecret_chat_${roomId}_${participantId}_role`, 'participant');
         
-        // 6. 跳轉到聊天室
-        window.location.href = chatRoomUrl;
+        // 6. 跳轉到聊天室（使用 base path）
+        const fullChatUrl = window.location.origin + basePath.replace(/\/$/, '') + chatRoomUrl;
+        window.location.href = fullChatUrl;
         
     } catch (error) {
         console.error('加入房間失敗:', error);
@@ -98,4 +125,10 @@ async function initParticipant() {
     }
 }
 
-init();
+// 等待 DOM 載入完成
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    // DOM 已經載入完成
+    init();
+}

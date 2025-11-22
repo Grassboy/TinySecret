@@ -4,11 +4,50 @@ const pathParts = window.location.pathname.split('/').filter(p => p);
 const roomId = pathParts[pathParts.length - 2];
 const participantId = pathParts[pathParts.length - 1];
 
+// 獲取 base path（例如：/tinySecret/ 或 /）
+function getBasePath() {
+    const base = document.querySelector('base');
+    if (base) {
+        const href = base.getAttribute('href');
+        // 從完整 URL 中提取路徑部分
+        try {
+            const url = new URL(href, window.location.origin);
+            const path = url.pathname;
+            return path.endsWith('/') ? path : path + '/';
+        } catch (e) {
+            // 如果解析失敗，假設 href 已經是路徑
+            return href.endsWith('/') ? href : href + '/';
+        }
+    }
+    // 如果沒有 base tag，從 pathname 推斷
+    const path = window.location.pathname;
+    const parts = path.split('/').filter(p => p);
+    if (parts.length > 0) {
+        return '/' + parts[0] + '/';
+    }
+    return '/';
+}
+
+const basePath = getBasePath();
+
 let myPrivateKey, myPublicKey, peerPublicKey;
 let socket;
 
 async function init() {
     try {
+        // 等待 Socket.IO 載入
+        let retries = 0;
+        while (typeof io === 'undefined' && retries < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+        }
+        
+        if (typeof io === 'undefined') {
+            console.error('Socket.IO 載入超時');
+            showError('Socket.IO 載入失敗，請重新整理頁面');
+            return;
+        }
+        
         // 判斷角色
         const creatorRole = localStorage.getItem(`tinySecret_room_${roomId}_role`);
         const participantRole = localStorage.getItem(`tinySecret_chat_${roomId}_${participantId}_role`);
@@ -64,7 +103,7 @@ async function initCreator() {
     
     if (!peerPublicKeyBase64) {
         // 第一次進入：需要解密參與者的公鑰
-        const response = await fetch(`/api/room/${roomId}/participant/${participantId}`);
+        const response = await fetch(`${window.location.origin}${basePath}api/room/${roomId}/participant/${participantId}`);
         const { encryptedAESKey, encryptedPublicKey } = await response.json();
         
         // 1. 用我的私鑰解密 AES 密鑰
@@ -98,15 +137,68 @@ async function initParticipant() {
 }
 
 function initWebSocket() {
-    socket = io();
+    // 檢查 Socket.IO 是否已載入
+    if (typeof io === 'undefined') {
+        console.error('Socket.IO 未載入');
+        showError('Socket.IO 未載入，請重新整理頁面');
+        return;
+    }
     
+    // 計算 Socket.IO 路徑
+    // basePath 例如：'/tinySecret/' 或 '/'
+    // Socket.IO 的 path 選項需要是完整路徑，例如：'/tinySecret/socket.io' 或 '/socket.io'
+    const socketPath = basePath.replace(/\/$/, '') + '/socket.io';
+    console.log('Base Path:', basePath);
+    console.log('Socket.IO 路徑:', socketPath);
+    console.log('當前 URL:', window.location.href);
+    
+    socket = io({
+        path: socketPath,
+        transports: ['websocket'],  // 只使用 WebSocket，禁用 polling
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        timeout: 20000,
+        forceNew: true,
+        upgrade: false,  // 禁用升級（因為只有 websocket）
+        rememberUpgrade: false
+    });
+    
+    // 添加所有事件監聽以便調試
     socket.on('connect', () => {
-        console.log('WebSocket 已連接');
+        console.log('✅ WebSocket 已連接，Socket ID:', socket.id);
+        console.log('✅ 傳輸方式:', socket.io.engine.transport.name);
         document.getElementById('statusText').textContent = '已連接';
         document.querySelector('.status-dot').style.background = '#28a745';
         
         // 加入聊天室
         socket.emit('join-chat', { roomId, participantId });
+    });
+    
+    socket.on('connect_error', (error) => {
+        console.error('❌ WebSocket 連接錯誤:', error);
+        console.error('❌ 錯誤詳情:', {
+            message: error.message,
+            type: error.type,
+            description: error.description,
+            context: error.context
+        });
+        console.error('❌ 嘗試連接的路徑:', socketPath);
+        showError('連接失敗: ' + error.message);
+    });
+    
+    socket.on('disconnect', (reason) => {
+        console.log('⚠️ WebSocket 斷線:', reason);
+        document.getElementById('statusText').textContent = '已斷線';
+        document.querySelector('.status-dot').style.background = '#dc3545';
+    });
+    
+    socket.on('reconnect_attempt', () => {
+        console.log('🔄 嘗試重新連接...');
+    });
+    
+    socket.on('reconnect_failed', () => {
+        console.error('❌ 重新連接失敗');
     });
     
     socket.on('joined', () => {
@@ -230,5 +322,11 @@ function showError(message) {
     container.appendChild(errorDiv);
 }
 
-init();
+// 等待 DOM 載入完成
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    // DOM 已經載入完成
+    init();
+}
 

@@ -4,7 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TinySecret - 加入聊天室</title>
-    <link rel="stylesheet" href="/styles.css">
+    <script>
+        (function() {
+            // 動態計算 base path
+            var path = window.location.pathname;
+            // 移除末尾的斜線（如果有的話）
+            if (path.endsWith('/') && path !== '/') {
+                path = path.slice(0, -1);
+            }
+            // 對於 /tinySecret/roomId 或 /tinySecret/roomId/userId，需要找到 /tinySecret 部分
+            var parts = path.split('/').filter(p => p);
+            var basePath = '/';
+            if (parts.length > 0) {
+                // 找到第一個可能是 base path 的部分（例如 tinySecret）
+                // 如果路徑是 /tinySecret/xxxxx，base 應該是 /tinySecret/
+                // 如果路徑是 /tinySecret/xxxxx/yyyyy，base 也應該是 /tinySecret/
+                basePath = '/' + parts[0] + '/';
+            }
+            var base = window.location.origin + basePath;
+            document.write('<base href="' + base + '">');
+            document.write('<link rel="stylesheet" href="' + base + 'styles.css">');
+            document.write('<script src="' + base + 'crypto.js"><\/script>');
+            document.write('<script src="' + base + 'room.js"><\/script>');
+        })();
+    </script>
 </head>
 <body>
     <div class="container">
@@ -14,18 +37,11 @@
 
         <div id="creatorView" class="card" style="display: none;">
             <h2>你的聊天室</h2>
-            <p class="description">分享下方連結給對方，等待對方加入</p>
+            <p class="description">分享下方連結給對方，和對方一同建立與您專屬的私密聊天室</p>
             
             <div class="url-box">
                 <input type="text" id="roomUrl" readonly>
                 <button id="copyBtn" class="btn-secondary">複製</button>
-            </div>
-            
-            <div id="waitingArea">
-                <div class="status-box">
-                    <div class="status-icon">⏳</div>
-                    <h3>等待對方加入...</h3>
-                </div>
             </div>
         </div>
 
@@ -39,8 +55,5 @@
             </div>
         </div>
     </div>
-
-    <script src="/crypto.js"></script>
-    <script src="/room.js"></script>
 </body>
 </html>

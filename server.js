@@ -6,7 +6,11 @@ const path = require('path');
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer);
+const io = new Server(httpServer, {
+    path: '/socket.io',
+    transports: ['websocket'],  // 只使用 WebSocket
+    allowEIO3: true
+});
 
 // 房間結構：{ 
 //   creatorPublicKey: string (完整公鑰，明文，只給參與者用於加密),
