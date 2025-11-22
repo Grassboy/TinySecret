@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TinySecret - 加密聊天</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🔒 TinySecret</h1>
+            <p class="chat-status">
+                <span class="status-dot"></span>
+                <span id="statusText">連接中...</span>
+            </p>
+        </div>
+
+        <div id="messagesContainer" class="messages-container">
+            <div class="system-message">
+                🔐 端對端加密對話已建立，伺服器無法解密你的訊息
+            </div>
+        </div>
+
+        <div class="input-container">
+            <textarea 
+                id="messageInput" 
+                placeholder="輸入訊息..." 
+                rows="2"
+            ></textarea>
+            <button id="sendBtn" class="btn-send" disabled>
+                發送
+            </button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/crypto.js"></script>
+    <script src="/chat.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TinySecret - 端對端加密聊天</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <h1>🔒 TinySecret</h1>
+            <p class="subtitle">端對端加密的即時聊天</p>
+            <p class="subtitle-small">伺服器無法解密你的訊息</p>
+        </div>
+
+        <div class="card">
+            <h2>開始安全對話</h2>
+            <p class="description">點擊下方按鈕創建加密聊天室，分享連結給對方即可開始對話</p>
+            
+            <button id="createRoomBtn" class="btn-primary">
+                創建聊天室
+            </button>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🔐</div>
+                <h3>端對端加密</h3>
+                <p>使用 RSA-2048 加密，伺服器只轉發密文</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🚫</div>
+                <h3>不存訊息</h3>
+                <p>伺服器不儲存任何訊息內容</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⏱️</div>
+                <h3>自動過期</h3>
+                <p>15分鐘無活動自動清除房間</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/crypto.js"></script>
+    <script>
+        document.getElementById('createRoomBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('createRoomBtn');
+            btn.disabled = true;
+            btn.textContent = '生成金鑰中...';
+
+            try {
+                // 生成 RSA 金鑰對
+                const keyPair = await CryptoHelper.generateKeyPair();
+                const publicKeyBase64 = await CryptoHelper.exportPublicKey(keyPair.publicKey);
+                const privateKeyBase64 = await CryptoHelper.exportPrivateKey(keyPair.privateKey);
+                
+                btn.textContent = '創建房間中...';
+                
+                // 創建房間
+                const response = await fetch('/api/create-room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ publicKey: publicKeyBase64 })
+                });
+
+                const { roomId } = await response.json();
+                
+                // 儲存金鑰到 localStorage
+                localStorage.setItem(`tinySecret_room_${roomId}_privateKey`, privateKeyBase64);
+                localStorage.setItem(`tinySecret_room_${roomId}_publicKey`, publicKeyBase64);
+                localStorage.setItem(`tinySecret_room_${roomId}_role`, 'creator');
+                
+                // 跳轉到房間
+                window.location.href = `/${roomId}`;
+            } catch (error) {
+                console.error('創建房間失敗:', error);
+                alert('創建房間失敗，請重試');
+                btn.disabled = false;
+                btn.textContent = '創建聊天室';
+            }
+        });
+    </script>
+</body>
+</html>

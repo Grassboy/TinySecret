@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TinySecret - 加入聊天室</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <h1>🔒 TinySecret</h1>
+        </div>
+
+        <div id="creatorView" class="card" style="display: none;">
+            <h2>你的聊天室</h2>
+            <p class="description">分享下方連結給對方，等待對方加入</p>
+            
+            <div class="url-box">
+                <input type="text" id="roomUrl" readonly>
+                <button id="copyBtn" class="btn-secondary">複製</button>
+            </div>
+            
+            <div id="waitingArea">
+                <div class="status-box">
+                    <div class="status-icon">⏳</div>
+                    <h3>等待對方加入...</h3>
+                </div>
+            </div>
+        </div>
+
+        <div id="participantView" class="card" style="display: none;">
+            <h2>加入聊天室</h2>
+            <p class="description">正在生成金鑰並加密...</p>
+            
+            <div class="status-box">
+                <div class="status-icon">🔐</div>
+                <h3 id="statusText">處理中</h3>
+            </div>
+        </div>
+    </div>
+
+    <script src="/crypto.js"></script>
+    <script src="/room.js"></script>
+</body>
+</html>

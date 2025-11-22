@@ -1,0 +1,19 @@
+{
+    "name": "tinysecret",
+    "version": "1.0.0",
+    "description": "端對端加密的即時聊天應用",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "nodemon server.js"
+    },
+    "dependencies": {
+        "express": "^4.18.2",
+        "socket.io": "^4.6.1",
+        "nanoid": "^3.3.7"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1"
+    }
+}
+
