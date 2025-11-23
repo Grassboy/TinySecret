@@ -164,6 +164,7 @@ function showErrorPage(title, description) {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>TinySecret - ${title}</title>
+            <link rel="icon" type="image/png" href="${basePath}favicon.png">
             <link rel="stylesheet" href="${basePath}styles.css">
         </head>
         <body>

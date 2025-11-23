@@ -20,6 +20,7 @@
             // 對於 /，base 就是 /
             var base = window.location.origin + path;
             document.write('<base href="' + base + '">');
+            document.write('<link rel="icon" type="image/png" href="' + base + 'favicon.png">');
             document.write('<link rel="stylesheet" href="' + base + 'styles.css">');
             document.write('<script src="' + base + 'crypto.js"><\/script>');
         })();
