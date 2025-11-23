@@ -187,24 +187,73 @@ install_node_with_package_manager() {
     if command_exists apt-get; then
         # Debian/Ubuntu
         print_info "檢測到 apt-get，使用 apt 安裝 Node.js..."
+        
+        # 檢查是否需要添加 NodeSource 倉庫（Ubuntu/Debian 默認倉庫的 Node.js 版本可能較舊）
+        if ! apt-cache show nodejs 2>/dev/null | grep -q "Version:"; then
+            print_info "添加 NodeSource 倉庫以獲取最新版本的 Node.js..."
+            curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+        fi
+        
         sudo apt-get update
-        sudo apt-get install -y nodejs npm
-        return 0
+        sudo apt-get install -y nodejs
+        
+        # 驗證安裝
+        if command_exists node && command_exists npm; then
+            return 0
+        else
+            print_warning "apt 安裝可能失敗，嘗試其他方法..."
+            return 1
+        fi
     elif command_exists yum; then
         # CentOS/RHEL
         print_info "檢測到 yum，使用 yum 安裝 Node.js..."
-        sudo yum install -y nodejs npm
-        return 0
+        
+        # 檢查是否需要添加 NodeSource 倉庫
+        if ! yum list available nodejs 2>/dev/null | grep -q "nodejs"; then
+            print_info "添加 NodeSource 倉庫以獲取最新版本的 Node.js..."
+            curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+        fi
+        
+        sudo yum install -y nodejs
+        
+        # 驗證安裝
+        if command_exists node && command_exists npm; then
+            return 0
+        else
+            print_warning "yum 安裝可能失敗，嘗試其他方法..."
+            return 1
+        fi
     elif command_exists dnf; then
         # Fedora
         print_info "檢測到 dnf，使用 dnf 安裝 Node.js..."
-        sudo dnf install -y nodejs npm
-        return 0
+        
+        # 檢查是否需要添加 NodeSource 倉庫
+        if ! dnf list available nodejs 2>/dev/null | grep -q "nodejs"; then
+            print_info "添加 NodeSource 倉庫以獲取最新版本的 Node.js..."
+            curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+        fi
+        
+        sudo dnf install -y nodejs
+        
+        # 驗證安裝
+        if command_exists node && command_exists npm; then
+            return 0
+        else
+            print_warning "dnf 安裝可能失敗，嘗試其他方法..."
+            return 1
+        fi
     elif command_exists brew; then
         # macOS
         print_info "檢測到 Homebrew，使用 brew 安裝 Node.js..."
         brew install node
-        return 0
+        
+        # 驗證安裝
+        if command_exists node && command_exists npm; then
+            return 0
+        else
+            print_warning "brew 安裝可能失敗，嘗試其他方法..."
+            return 1
+        fi
     fi
     
     return 1
@@ -220,18 +269,22 @@ main() {
         print_warning "Node.js 未安裝，開始安裝..."
         echo ""
         
-        # 優先嘗試使用 nvm 安裝
-        if install_node_with_nvm; then
-            print_success "使用 nvm 成功安裝 Node.js"
-        # 如果 nvm 失敗，嘗試使用系統套件管理器
-        elif install_node_with_package_manager; then
+        # 優先使用系統套件管理器安裝（直接安裝到系統，無需額外配置）
+        if install_node_with_package_manager; then
             print_success "使用系統套件管理器成功安裝 Node.js"
+        # 如果系統套件管理器失敗，嘗試使用 nvm
+        elif install_node_with_nvm; then
+            print_success "使用 nvm 成功安裝 Node.js"
         else
             print_error "無法自動安裝 Node.js"
             echo ""
             print_info "請手動安裝 Node.js："
             echo "  1. 訪問 https://nodejs.org/ 下載並安裝"
-            echo "  2. 或使用 nvm: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
+            echo "  2. 或使用系統套件管理器："
+            echo "     - Debian/Ubuntu: sudo apt-get install nodejs npm"
+            echo "     - CentOS/RHEL: sudo yum install nodejs npm"
+            echo "     - Fedora: sudo dnf install nodejs npm"
+            echo "     - macOS: brew install node"
             echo ""
             exit 1
         fi
