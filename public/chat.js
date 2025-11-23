@@ -97,6 +97,9 @@ async function init() {
         // 初始化輸入
         initInput();
         
+        // 初始化文件上傳
+        initFileUpload();
+        
         // 初始化離開按鈕
         initExitButton();
         
@@ -416,9 +419,40 @@ function initWebSocket() {
             const aesKey = await CryptoHelper.importAESKey(aesKeyBase64);
             
             // 2. 用 AES 密鑰解密訊息
-            const decryptedMessage = await CryptoHelper.decryptWithAES(encryptedMessage, aesKey);
+            const decryptedMessageJson = await CryptoHelper.decryptWithAES(encryptedMessage, aesKey);
             
-            addMessage(decryptedMessage, false, timestamp);
+            // 3. 嘗試解析為 JSON（文件消息），如果失敗則當作文本消息
+            let messageObj;
+            try {
+                messageObj = JSON.parse(decryptedMessageJson);
+            } catch (e) {
+                // 舊格式或純文本，直接當作文本消息
+                addMessage(decryptedMessageJson, false, timestamp);
+                if (isPageVisible && socket && socket.connected) {
+                    socket.emit('ping', { roomId, participantId });
+                }
+                return;
+            }
+            
+            // 4. 根據消息類型處理
+            if (messageObj.type === 'file') {
+                // 文件消息
+                if (messageObj.totalChunks > 1) {
+                    // 分段文件，需要重組
+                    handleFileChunk(messageObj);
+                } else {
+                    // 單塊文件，直接顯示
+                    addFileMessageFromBase64({
+                        fileName: messageObj.fileName,
+                        fileType: messageObj.fileType,
+                        fileSize: messageObj.fileSize,
+                        isImage: messageObj.isImage
+                    }, messageObj.content, false, timestamp);
+                }
+            } else {
+                // 文本消息
+                addMessage(messageObj.content || decryptedMessageJson, false, timestamp);
+            }
             
             // 收到訊息後回 ping 給對方（只有在頁面可見時才回 ping）
             // 對方收到這個 ping 後，會判斷是否在收到消息後 3 秒內，如果是則標記為已讀
@@ -584,6 +618,381 @@ function showError(message) {
     errorDiv.className = 'system-message error';
     errorDiv.textContent = '❌ ' + message;
     container.appendChild(errorDiv);
+}
+
+// 文件上傳相關變量
+const CHUNK_SIZE = 100 * 1024; // 100KB 每塊
+const pendingFileChunks = new Map(); // 存儲待重組的文件塊
+
+function initFileUpload() {
+    const fileInput = document.getElementById('fileInput');
+    const fileUploadBtn = document.getElementById('fileUploadBtn');
+    
+    if (!fileInput || !fileUploadBtn) return;
+    
+    // 點擊上傳按鈕觸發文件選擇
+    fileUploadBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    // 處理文件選擇
+    fileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        
+        for (const file of files) {
+            try {
+                await sendFile(file);
+            } catch (error) {
+                console.error('文件發送失敗:', error);
+                showError('文件發送失敗: ' + error.message);
+            }
+        }
+        
+        // 清空文件選擇
+        fileInput.value = '';
+    });
+}
+
+// 將文件轉換為 Base64
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // 移除 data URL 前綴（data:image/png;base64,）
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// 判斷是否為圖片文件
+function isImageFile(fileName) {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
+    const ext = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
+    return imageExtensions.includes(ext);
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// 發送文件（支持分段傳輸）
+async function sendFile(file) {
+    try {
+        // 將文件轉換為 base64
+        const fileBase64 = await fileToBase64(file);
+        
+        // 構建文件消息對象
+        const fileMessage = {
+            type: 'file',
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            isImage: isImageFile(file.name),
+            totalChunks: 1,
+            chunkIndex: 0,
+            content: fileBase64
+        };
+        
+        // 如果文件太大，需要分段傳輸
+        if (fileBase64.length > CHUNK_SIZE) {
+            const totalChunks = Math.ceil(fileBase64.length / CHUNK_SIZE);
+            fileMessage.totalChunks = totalChunks;
+            
+            // 先顯示上傳中的消息（如果是圖片，先顯示文件名，完成後再更新為圖片）
+            let messageElement = null;
+            if (isImageFile(file.name)) {
+                // 圖片：先顯示文件名，完成後更新為圖片
+                messageElement = addFileMessage(file, true, Date.now(), true);
+            } else {
+                // 非圖片：顯示上傳中
+                messageElement = addFileMessage(file, true, Date.now(), true);
+            }
+            
+            // 分段發送
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, fileBase64.length);
+                const chunk = fileBase64.substring(start, end);
+                
+                const chunkMessage = {
+                    ...fileMessage,
+                    chunkIndex: i,
+                    content: chunk
+                };
+                
+                await sendFileChunk(chunkMessage);
+            }
+            
+            // 發送完成後，如果是圖片，更新顯示為圖片
+            if (isImageFile(file.name) && messageElement) {
+                updateFileMessageToImage(messageElement, file);
+            } else if (messageElement) {
+                // 非圖片：更新為完成狀態
+                updateFileMessageComplete(messageElement, file);
+            }
+        } else {
+            // 小文件直接發送
+            await sendFileChunk(fileMessage);
+            // 顯示自己的文件消息（圖片會直接顯示）
+            addFileMessage(file, true, Date.now());
+        }
+        
+        // 記錄發送消息的時間和元素
+        lastMessageSentTime = Date.now();
+        
+    } catch (error) {
+        console.error('文件發送失敗:', error);
+        showError('文件發送失敗: ' + error.message);
+        throw error;
+    }
+}
+
+// 發送文件塊（加密並發送）
+async function sendFileChunk(fileMessage) {
+    try {
+        // 將消息對象轉換為 JSON 字符串
+        const messageJson = JSON.stringify(fileMessage);
+        
+        // 混合加密：為每條訊息生成隨機 AES 密鑰
+        // 1. 生成隨機 AES 密鑰
+        const aesKey = await CryptoHelper.generateAESKey();
+        const aesKeyBase64 = await CryptoHelper.exportAESKey(aesKey);
+        
+        // 2. 用 AES 加密訊息（無長度限制）
+        const encryptedMessage = await CryptoHelper.encryptWithAES(messageJson, aesKey);
+        
+        // 3. 用對方的 RSA 公鑰加密 AES 密鑰（只有 32 字節）
+        const encryptedAESKey = await CryptoHelper.encryptMessage(aesKeyBase64, peerPublicKey);
+        
+        // 發送：加密的 AES 密鑰 + AES 加密的訊息
+        socket.emit('send-message', {
+            roomId,
+            participantId,
+            encryptedAESKey,
+            encryptedMessage
+        });
+    } catch (error) {
+        console.error('文件塊發送失敗:', error);
+        throw error;
+    }
+}
+
+// 添加文件消息到聊天界面
+function addFileMessage(file, isSelf, timestamp, isUploading = false) {
+    const container = document.getElementById('messagesContainer');
+    const messageWrapper = document.createElement('div');
+    messageWrapper.className = `message-wrapper ${isSelf ? 'message-self' : 'message-other'}`;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message-file ${isSelf ? 'message-self' : 'message-other'}`;
+    messageDiv.dataset.fileName = file.name; // 保存文件名以便後續更新
+    
+    if (isImageFile(file.name) && !isUploading) {
+        // 圖片直接顯示
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.className = 'message-file-image';
+        img.onload = () => {
+            URL.revokeObjectURL(img.src);
+        };
+        messageDiv.appendChild(img);
+    } else {
+        // 非圖片或上傳中：顯示文件名和大小
+        const fileInfo = document.createElement('div');
+        fileInfo.className = 'message-file-info';
+        
+        const fileName = document.createElement('div');
+        fileName.className = 'message-file-name';
+        fileName.textContent = file.name;
+        
+        const fileSize = document.createElement('div');
+        fileSize.className = 'message-file-size';
+        fileSize.textContent = isUploading ? '上傳中...' : formatFileSize(file.size);
+        
+        fileInfo.appendChild(fileName);
+        fileInfo.appendChild(fileSize);
+        
+        if (!isUploading) {
+            // 創建下載鏈接
+            const downloadLink = document.createElement('a');
+            downloadLink.href = URL.createObjectURL(file);
+            downloadLink.download = file.name;
+            downloadLink.className = 'message-file-download';
+            downloadLink.textContent = '📥 下載';
+            downloadLink.onclick = () => {
+                setTimeout(() => URL.revokeObjectURL(downloadLink.href), 100);
+            };
+            fileInfo.appendChild(downloadLink);
+        }
+        
+        messageDiv.appendChild(fileInfo);
+    }
+    
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'message-time';
+    timeDiv.textContent = new Date(timestamp).toLocaleTimeString('zh-TW', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    messageWrapper.appendChild(messageDiv);
+    messageWrapper.appendChild(timeDiv);
+    container.appendChild(messageWrapper);
+    
+    // 滾動到底部
+    container.scrollTop = container.scrollHeight;
+    
+    // 返回消息元素
+    return messageWrapper;
+}
+
+// 更新文件消息為圖片顯示（用於大文件上傳完成後）
+function updateFileMessageToImage(messageWrapper, file) {
+    const messageDiv = messageWrapper.querySelector('.message-file');
+    if (!messageDiv) return;
+    
+    // 清空現有內容
+    messageDiv.innerHTML = '';
+    
+    // 創建圖片元素
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    img.className = 'message-file-image';
+    img.onload = () => {
+        URL.revokeObjectURL(img.src);
+    };
+    messageDiv.appendChild(img);
+}
+
+// 更新文件消息為完成狀態（用於非圖片文件上傳完成後）
+function updateFileMessageComplete(messageWrapper, file) {
+    const messageDiv = messageWrapper.querySelector('.message-file');
+    if (!messageDiv) return;
+    
+    const fileSize = messageDiv.querySelector('.message-file-size');
+    if (fileSize) {
+        fileSize.textContent = formatFileSize(file.size);
+    }
+    
+    // 添加下載鏈接（如果還沒有）
+    const fileInfo = messageDiv.querySelector('.message-file-info');
+    if (fileInfo && !fileInfo.querySelector('.message-file-download')) {
+        const downloadLink = document.createElement('a');
+        downloadLink.href = URL.createObjectURL(file);
+        downloadLink.download = file.name;
+        downloadLink.className = 'message-file-download';
+        downloadLink.textContent = '📥 下載';
+        downloadLink.onclick = () => {
+            setTimeout(() => URL.revokeObjectURL(downloadLink.href), 100);
+        };
+        fileInfo.appendChild(downloadLink);
+    }
+}
+
+// 從 Base64 添加文件消息（接收到的文件）
+function addFileMessageFromBase64(fileInfo, fileBase64, isSelf, timestamp) {
+    const container = document.getElementById('messagesContainer');
+    const messageWrapper = document.createElement('div');
+    messageWrapper.className = `message-wrapper ${isSelf ? 'message-self' : 'message-other'}`;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message-file ${isSelf ? 'message-self' : 'message-other'}`;
+    
+    if (fileInfo.isImage) {
+        // 圖片直接顯示
+        const img = document.createElement('img');
+        img.src = 'data:' + fileInfo.fileType + ';base64,' + fileBase64;
+        img.className = 'message-file-image';
+        messageDiv.appendChild(img);
+    } else {
+        // 非圖片：顯示文件名和大小，提供下載
+        const fileInfoDiv = document.createElement('div');
+        fileInfoDiv.className = 'message-file-info';
+        
+        const fileName = document.createElement('div');
+        fileName.className = 'message-file-name';
+        fileName.textContent = fileInfo.fileName;
+        
+        const fileSize = document.createElement('div');
+        fileSize.className = 'message-file-size';
+        fileSize.textContent = formatFileSize(fileInfo.fileSize);
+        
+        // 創建下載鏈接
+        const downloadLink = document.createElement('a');
+        downloadLink.href = 'data:' + fileInfo.fileType + ';base64,' + fileBase64;
+        downloadLink.download = fileInfo.fileName;
+        downloadLink.className = 'message-file-download';
+        downloadLink.textContent = '📥 下載';
+        fileInfoDiv.appendChild(fileName);
+        fileInfoDiv.appendChild(fileSize);
+        fileInfoDiv.appendChild(downloadLink);
+        
+        messageDiv.appendChild(fileInfoDiv);
+    }
+    
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'message-time';
+    timeDiv.textContent = new Date(timestamp).toLocaleTimeString('zh-TW', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    messageWrapper.appendChild(messageDiv);
+    messageWrapper.appendChild(timeDiv);
+    container.appendChild(messageWrapper);
+    
+    // 滾動到底部
+    container.scrollTop = container.scrollHeight;
+    
+    return messageWrapper;
+}
+
+// 處理接收到的文件塊（重組）
+function handleFileChunk(fileMessage) {
+    const fileId = `${fileMessage.fileName}-${fileMessage.fileSize}`;
+    
+    if (!pendingFileChunks.has(fileId)) {
+        // 創建新的文件塊緩存
+        pendingFileChunks.set(fileId, {
+            fileName: fileMessage.fileName,
+            fileType: fileMessage.fileType,
+            fileSize: fileMessage.fileSize,
+            isImage: fileMessage.isImage,
+            totalChunks: fileMessage.totalChunks,
+            chunks: new Array(fileMessage.totalChunks).fill(null),
+            receivedChunks: 0
+        });
+    }
+    
+    const fileData = pendingFileChunks.get(fileId);
+    fileData.chunks[fileMessage.chunkIndex] = fileMessage.content;
+    fileData.receivedChunks++;
+    
+    // 檢查是否所有塊都已收到
+    if (fileData.receivedChunks === fileData.totalChunks) {
+        // 重組文件
+        const completeBase64 = fileData.chunks.join('');
+        
+        // 顯示文件
+        addFileMessageFromBase64({
+            fileName: fileData.fileName,
+            fileType: fileData.fileType,
+            fileSize: fileData.fileSize,
+            isImage: fileData.isImage
+        }, completeBase64, false, Date.now());
+        
+        // 清理緩存
+        pendingFileChunks.delete(fileId);
+    }
 }
 
 function initExitButton() {
