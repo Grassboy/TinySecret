@@ -12,14 +12,22 @@
             if (path.endsWith('/') && path !== '/') {
                 path = path.slice(0, -1);
             }
-            // 對於 /tinySecret/roomId 或 /tinySecret/roomId/userId，需要找到 /tinySecret 部分
             var parts = path.split('/').filter(p => p);
             var basePath = '/';
+            
+            // 判斷邏輯：
+            // 1. 如果路徑是 /tinySecret/roomId，base 應該是 /tinySecret/
+            // 2. 如果路徑是 /roomId（本地訪問），base 應該是 /
+            // 3. 已知的 base path 列表（例如 tinySecret）
+            var knownBasePaths = ['tinySecret'];
+            
             if (parts.length > 0) {
-                // 找到第一個可能是 base path 的部分（例如 tinySecret）
-                // 如果路徑是 /tinySecret/xxxxx，base 應該是 /tinySecret/
-                // 如果路徑是 /tinySecret/xxxxx/yyyyy，base 也應該是 /tinySecret/
-                basePath = '/' + parts[0] + '/';
+                var firstPart = parts[0];
+                // 如果第一個部分是已知的 base path，使用它
+                if (knownBasePaths.includes(firstPart)) {
+                    basePath = '/' + firstPart + '/';
+                }
+                // 否則 base 保持為 '/'（本地訪問，房間ID直接在第一層）
             }
             var base = window.location.origin + basePath;
             document.write('<base href="' + base + '">');

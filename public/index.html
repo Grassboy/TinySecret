@@ -8,8 +8,12 @@
         (function() {
             // 動態計算 base path
             var path = window.location.pathname;
+            // 移除末尾的斜線（如果有的話）
+            if (path.endsWith('/') && path !== '/') {
+                path = path.slice(0, -1);
+            }
             // 確保 path 以 / 結尾（除了根路徑）
-            if (!path.endsWith('/')) {
+            if (path !== '/') {
                 path = path + '/';
             }
             // 對於 /tinySecret/，base 就是 /tinySecret/
