@@ -32,6 +32,12 @@ const basePath = getBasePath();
 
 let myPrivateKey, myPublicKey, peerPublicKey;
 let socket;
+let peerOnline = false;
+let peerOfflineTimer;
+let offlineNoticeElement = null;
+let isPageVisible = true;
+let lastMessageSentTime = 0; // 記錄最後發送消息的時間
+let lastSentMessageElement = null; // 記錄最後發送的消息元素
 
 async function init() {
     try {
@@ -168,15 +174,145 @@ function initWebSocket() {
     socket.on('connect', () => {
         console.log('✅ WebSocket 已連接，Socket ID:', socket.id);
         console.log('✅ 傳輸方式:', socket.io.engine.transport.name);
-        document.getElementById('statusText').textContent = '已連接';
-        const statusDot = document.querySelector('.status-dot');
-        statusDot.style.background = '#28a745';
-        statusDot.classList.add('connected');
-        statusDot.classList.remove('disconnected');
+        updateStatus();
         
         // 加入聊天室
         socket.emit('join-chat', { roomId, participantId });
+        
+        // 進入聊天室時發送一次 ping（只有在頁面可見時才發送）
+        if (isPageVisible) {
+            socket.emit('ping', { roomId, participantId });
+        }
     });
+    
+    // 監聽頁面可見性變化
+    document.addEventListener('visibilitychange', () => {
+        isPageVisible = !document.hidden;
+        
+        if (!isPageVisible) {
+            // 頁面隱藏時，不應該回 ping
+            console.log('📱 頁面已隱藏，停止自動回 ping');
+        } else {
+            // 頁面重新可見時，發送一次 ping 告知對方我回來了
+            if (socket && socket.connected) {
+                console.log('📱 頁面重新可見，發送 ping');
+                socket.emit('ping', { roomId, participantId });
+            }
+        }
+    });
+    
+    // 監聽頁面卸載（關閉或刷新）
+    window.addEventListener('beforeunload', () => {
+        // 頁面即將關閉，不需要特別處理，WebSocket 會自動斷開
+        console.log('📱 頁面即將關閉');
+    });
+    
+    function updateStatus() {
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.querySelector('.status-dot');
+        
+        if (socket && socket.connected) {
+            statusDot.classList.add('connected');
+            statusDot.classList.remove('disconnected');
+            
+            if (peerOnline) {
+                // 對方已連接 - 綠燈
+                statusText.textContent = '已連接 · 對方已連接';
+                statusDot.style.background = '#28a745';
+                // 隱藏離線提示
+                hideOfflineNotice();
+            } else {
+                // 對方連接中 - 黃燈
+                statusText.textContent = '已連接 · 對方連接中';
+                statusDot.style.background = '#ffc107';
+                // 顯示離線提示
+                showOfflineNotice();
+            }
+        } else {
+            statusText.textContent = '連接中...';
+            statusDot.style.background = '#ffc107';
+            statusDot.classList.remove('connected');
+            statusDot.classList.add('disconnected');
+            // 隱藏離線提示（因為自己還沒連接）
+            hideOfflineNotice();
+        }
+    }
+    
+    function showOfflineNotice() {
+        // 如果已經顯示，就不重複創建
+        if (offlineNoticeElement && offlineNoticeElement.parentNode) {
+            return;
+        }
+        
+        const container = document.getElementById('messagesContainer');
+        
+        // 創建系統消息容器
+        const noticeDiv = document.createElement('div');
+        noticeDiv.className = 'system-message offline-notice';
+        
+        // 提示文字
+        const textDiv = document.createElement('div');
+        textDiv.textContent = '對方尚未上線，請將下方聊天連結複製丟給對方，對方也連上後才能互相交談喲';
+        textDiv.style.marginBottom = '12px';
+        noticeDiv.appendChild(textDiv);
+        
+        // 連結輸入框和複製按鈕容器
+        const linkContainer = document.createElement('div');
+        linkContainer.style.display = 'flex';
+        linkContainer.style.gap = '8px';
+        linkContainer.style.alignItems = 'center';
+        
+        // 輸入框
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = window.location.href;
+        input.readOnly = true;
+        input.style.flex = '1';
+        input.style.padding = '8px';
+        input.style.borderRadius = '4px';
+        input.style.border = '1px solid #ddd';
+        input.style.backgroundColor = '#f5f5f5';
+        linkContainer.appendChild(input);
+        
+        // 複製按鈕
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = '複製';
+        copyBtn.style.padding = '8px 16px';
+        copyBtn.style.borderRadius = '4px';
+        copyBtn.style.border = 'none';
+        copyBtn.style.backgroundColor = '#0073e6';
+        copyBtn.style.color = 'white';
+        copyBtn.style.cursor = 'pointer';
+        copyBtn.onclick = () => {
+            input.select();
+            document.execCommand('copy');
+            // 短暫顯示複製成功提示
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '已複製！';
+            copyBtn.style.backgroundColor = '#28a745';
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+                copyBtn.style.backgroundColor = '#0073e6';
+            }, 2000);
+        };
+        linkContainer.appendChild(copyBtn);
+        
+        noticeDiv.appendChild(linkContainer);
+        container.appendChild(noticeDiv);
+        
+        // 保存引用以便後續操作
+        offlineNoticeElement = noticeDiv;
+        
+        // 滾動到底部
+        container.scrollTop = container.scrollHeight;
+    }
+    
+    function hideOfflineNotice() {
+        if (offlineNoticeElement && offlineNoticeElement.parentNode) {
+            offlineNoticeElement.remove();
+            offlineNoticeElement = null;
+        }
+    }
     
     socket.on('connect_error', (error) => {
         console.error('❌ WebSocket 連接錯誤:', error);
@@ -192,11 +328,12 @@ function initWebSocket() {
     
     socket.on('disconnect', (reason) => {
         console.log('⚠️ WebSocket 斷線:', reason);
-        document.getElementById('statusText').textContent = '已斷線';
-        const statusDot = document.querySelector('.status-dot');
-        statusDot.style.background = '#dc3545';
-        statusDot.classList.add('disconnected');
-        statusDot.classList.remove('connected');
+        if (peerOfflineTimer) {
+            clearTimeout(peerOfflineTimer);
+            peerOfflineTimer = null;
+        }
+        peerOnline = false;
+        updateStatus();
     });
     
     socket.on('reconnect_attempt', () => {
@@ -210,6 +347,47 @@ function initWebSocket() {
     socket.on('joined', () => {
         // 不直接啟用按鈕，讓輸入框監聽器根據內容決定
         // 按鈕狀態由輸入框內容決定
+        updateStatus();
+    });
+    
+    // 收到對方在線通知
+    socket.on('peer-online', () => {
+        peerOnline = true;
+        updateStatus();
+    });
+    
+    // 收到對方的 ping
+    socket.on('peer-ping', () => {
+        peerOnline = true;
+        updateStatus();
+        
+        // 重置超時計時器（5秒沒收到 ping 就認為對方可能離線）
+        if (peerOfflineTimer) {
+            clearTimeout(peerOfflineTimer);
+        }
+        peerOfflineTimer = setTimeout(() => {
+            peerOnline = false;
+            updateStatus();
+        }, 5000);
+        
+        // 判斷這個 ping 是否是收到消息後的回 ping
+        // 如果最近 3 秒內發送過消息，則認為這是收到消息後的回 ping，只標記最近發送的消息為已讀
+        const now = Date.now();
+        if (lastMessageSentTime > 0 && (now - lastMessageSentTime) < 3000 && lastSentMessageElement) {
+            // 這是收到消息後的回 ping，只標記最近發送的那條消息為已讀
+            const timeElement = lastSentMessageElement.querySelector('.message-time');
+            if (timeElement && !timeElement.classList.contains('read')) {
+                timeElement.classList.add('read');
+            }
+            lastMessageSentTime = 0; // 重置，避免重複標記
+            lastSentMessageElement = null; // 重置
+        }
+        // 否則，這可能是重新上線的 ping，不標記已讀
+        
+        // 回送 ping 給對方，讓對方也能更新狀態（只有在頁面可見時才回 ping）
+        if (isPageVisible && socket && socket.connected) {
+            socket.emit('ping', { roomId, participantId });
+        }
     });
     
     socket.on('new-message', async ({ encryptedAESKey, encryptedMessage, timestamp }) => {
@@ -223,6 +401,12 @@ function initWebSocket() {
             const decryptedMessage = await CryptoHelper.decryptWithAES(encryptedMessage, aesKey);
             
             addMessage(decryptedMessage, false, timestamp);
+            
+            // 收到訊息後回 ping 給對方（只有在頁面可見時才回 ping）
+            // 對方收到這個 ping 後，會判斷是否在收到消息後 3 秒內，如果是則標記為已讀
+            if (isPageVisible && socket && socket.connected) {
+                socket.emit('ping', { roomId, participantId });
+            }
         } catch (error) {
             console.error('解密失敗:', error);
             showError('解密失敗');
@@ -315,7 +499,11 @@ async function sendMessage() {
         });
         
         // 顯示自己的訊息
-        addMessage(message, true, Date.now());
+        const messageElement = addMessage(message, true, Date.now());
+        
+        // 記錄發送消息的時間和元素，用於判斷後續的 peer-ping 是否是收到消息後的回 ping
+        lastMessageSentTime = Date.now();
+        lastSentMessageElement = messageElement;
         
         // 清空輸入框
         input.value = '';
@@ -359,6 +547,17 @@ function addMessage(text, isSelf, timestamp) {
     
     // 滾動到底部
     container.scrollTop = container.scrollHeight;
+    
+    // 返回消息元素，以便後續操作
+    return messageWrapper;
+}
+
+function markMessagesAsRead() {
+    // 找到所有自己發送的消息中，尚未標記為已讀的
+    const selfMessages = document.querySelectorAll('.message-wrapper.message-self .message-time:not(.read)');
+    selfMessages.forEach(timeDiv => {
+        timeDiv.classList.add('read');
+    });
 }
 
 function showError(message) {

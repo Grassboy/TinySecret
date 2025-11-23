@@ -208,6 +208,20 @@ io.on('connection', (socket) => {
         updateRoomActivity(roomId);
         
         socket.emit('joined', { success: true });
+        
+        // 通知對方有新成員加入
+        socket.to(`${roomId}-${participantId}`).emit('peer-online', { roomId, participantId });
+    });
+    
+    // 處理 ping（表示用戶在線）
+    socket.on('ping', ({ roomId, participantId }) => {
+        const room = rooms.get(roomId);
+        if (!room) return;
+        
+        updateRoomActivity(roomId);
+        
+        // 轉發給對方
+        socket.to(`${roomId}-${participantId}`).emit('peer-ping', { roomId, participantId });
     });
     
     // 發送加密訊息
