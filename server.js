@@ -124,9 +124,23 @@ app.get('/api/room/:roomId/participant/:participantId', (req, res) => {
     res.json(encryptedData);  // 返回 { encryptedAESKey, encryptedPublicKey }
 });
 
+// 獲取 base path 的輔助函數
+function getBasePathFromRequest(req) {
+    // 使用 originalUrl 來獲取完整的原始路徑（包含 base path）
+    const pathname = req.originalUrl ? req.originalUrl.split('?')[0] : (req.path || req.url.split('?')[0]);
+    const parts = pathname.split('/').filter(p => p);
+    const knownBasePaths = ['tinySecret'];
+    
+    if (parts.length > 0 && knownBasePaths.includes(parts[0])) {
+        return '/' + parts[0] + '/';
+    }
+    return '/';
+}
+
 // 房間頁面
 app.get('/:roomId', (req, res) => {
     const { roomId } = req.params;
+    const basePath = getBasePathFromRequest(req);
     
     // 檢測 Line 預覽
     const userAgent = req.get('User-Agent') || '';
@@ -159,7 +173,7 @@ app.get('/:roomId', (req, res) => {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>TinySecret - 房間不存在或已過期</title>
-                <link rel="stylesheet" href="${req.baseUrl || ''}/styles.css">
+                <link rel="stylesheet" href="${basePath}styles.css">
             </head>
             <body>
                 <div class="container">
@@ -173,7 +187,7 @@ app.get('/:roomId', (req, res) => {
                             <div class="status-icon">❌</div>
                             <h3>房間不存在或已過期</h3>
                         </div>
-                        <button class="btn-primary" onclick="window.location.href = window.location.origin + '${req.baseUrl || ''}'" style="margin-top: 30px;">返回首頁</button>
+                        <button class="btn-primary" onclick="window.location.href = window.location.origin + '${basePath.replace(/\/$/, '')}'" style="margin-top: 30px;">返回首頁</button>
                     </div>
                 </div>
             </body>
@@ -187,6 +201,7 @@ app.get('/:roomId', (req, res) => {
 // 聊天室頁面
 app.get('/:roomId/:participantId', (req, res) => {
     const { roomId, participantId } = req.params;
+    const basePath = getBasePathFromRequest(req);
     
     // 檢測 Line 預覽
     const userAgent = req.get('User-Agent') || '';
@@ -219,7 +234,7 @@ app.get('/:roomId/:participantId', (req, res) => {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>TinySecret - 房間不存在或已過期</title>
-                <link rel="stylesheet" href="${req.baseUrl || ''}/styles.css">
+                <link rel="stylesheet" href="${basePath}styles.css">
             </head>
             <body>
                 <div class="container">
@@ -233,7 +248,7 @@ app.get('/:roomId/:participantId', (req, res) => {
                             <div class="status-icon">❌</div>
                             <h3>房間不存在或已過期</h3>
                         </div>
-                        <button class="btn-primary" onclick="window.location.href = window.location.origin + '${req.baseUrl || ''}'" style="margin-top: 30px;">返回首頁</button>
+                        <button class="btn-primary" onclick="window.location.href = window.location.origin + '${basePath.replace(/\/$/, '')}'" style="margin-top: 30px;">返回首頁</button>
                     </div>
                 </div>
             </body>
