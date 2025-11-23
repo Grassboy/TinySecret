@@ -128,35 +128,21 @@ app.get('/api/room/:roomId/participant/:participantId', (req, res) => {
 function buildBaseUrl(req, basePath) {
     // 優先檢查 X-Forwarded-Host（Apache 代理設置）
     const forwardedHost = req.get('X-Forwarded-Host');
-    if (forwardedHost && forwardedHost.includes('is.gy')) {
-        return 'https://is.gy' + basePath;
-    }
-    
-    // 檢查 Host 頭
     const host = req.get('Host') || '';
-    if (host.includes('is.gy')) {
-        return 'https://is.gy' + basePath;
-    }
-    
-    // 方法1: 從 Referer 頭提取（最可靠）
-    const referer = req.get('Referer');
-    if (referer) {
-        try {
-            const refererUrl = new URL(referer);
-            // 如果 Referer 的 host 是 is.gy，強制使用 https
-            if (refererUrl.hostname.includes('is.gy')) {
-                return 'https://is.gy' + basePath;
-            }
-            const refererOrigin = refererUrl.origin;
-            return refererOrigin + basePath;
-        } catch (e) {
-            // 如果解析失敗，繼續使用其他方法
-        }
-    }
-    
-    // 方法2: 使用 X-Forwarded-Proto 和 X-Forwarded-Host（反向代理設置）
-    const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'http';
     const finalHost = forwardedHost || host || 'localhost:10359';
+    
+    // 判斷是否為本地開發環境
+    const isLocalhost = finalHost.includes('localhost') || finalHost.includes('127.0.0.1');
+    
+    // 如果不是 localhost，使用該 host 作為 baseUrl 的一部分
+    if (!isLocalhost) {
+        // 使用 X-Forwarded-Proto，如果沒有則默認使用 https（因為不是 localhost）
+        const protocol = req.get('X-Forwarded-Proto') || 'https';
+        return protocol + '://' + finalHost + basePath;
+    }
+    
+    // 本地開發環境：使用 http
+    const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'http';
     return protocol + '://' + finalHost + basePath;
 }
 
@@ -190,21 +176,20 @@ function getBasePathFromRequest(req) {
         }
     }
     
-    // 3. 檢查 X-Forwarded-Host（Apache 代理設置）- 優先級高於 Host
+    // 3. 檢查 X-Forwarded-Host 和 Host 頭
     const forwardedHost = req.get('X-Forwarded-Host');
-    if (forwardedHost && forwardedHost.includes('is.gy')) {
-        // 如果是通過 is.gy 訪問，很可能是通過 /tinySecret 子路徑
-        return '/tinySecret/';
-    }
-    
-    // 4. 檢查 Host 頭
     const host = req.get('Host') || '';
-    if (host.includes('is.gy')) {
-        // 如果是通過 is.gy 訪問，很可能是通過 /tinySecret 子路徑
+    const finalHost = forwardedHost || host || 'localhost:10359';
+    
+    // 判斷是否為本地開發環境
+    const isLocalhost = finalHost.includes('localhost') || finalHost.includes('127.0.0.1');
+    
+    // 如果不是 localhost，推斷使用 /tinySecret/ 子路徑
+    if (!isLocalhost) {
         return '/tinySecret/';
     }
     
-    // 5. 使用 originalUrl（如果包含完整路徑）
+    // 4. 使用 originalUrl（如果包含完整路徑）
     const pathname = req.originalUrl ? req.originalUrl.split('?')[0] : (req.path || req.url.split('?')[0]);
     const parts = pathname.split('/').filter(p => p);
     const knownBasePaths = ['tinySecret'];
@@ -213,37 +198,14 @@ function getBasePathFromRequest(req) {
         return '/' + parts[0] + '/';
     }
     
-    // 6. 如果通過代理訪問（X-Forwarded-Host 存在），推斷使用 /tinySecret/
-    if (forwardedHost) {
-        return '/tinySecret/';
-    }
-    
-    // 7. 默認返回根路徑（本地開發）
+    // 5. 默認返回根路徑（本地開發）
     return '/';
 }
 
 // 房間頁面
 app.get('/:roomId', (req, res) => {
     const { roomId } = req.params;
-    
-    // 調試：輸出請求信息
-    console.log('=== 房間頁面請求調試 ===');
-    console.log('req.path:', req.path);
-    console.log('req.url:', req.url);
-    console.log('req.originalUrl:', req.originalUrl);
-    console.log('req.headers.referer:', req.get('Referer'));
-    console.log('req.headers.host:', req.get('Host'));
-    console.log('X-Forwarded-Host:', req.get('X-Forwarded-Host'));
-    console.log('X-Forwarded-Proto:', req.get('X-Forwarded-Proto'));
-    console.log('X-Forwarded-Path:', req.get('X-Forwarded-Path'));
-    console.log('X-Original-URI:', req.get('X-Original-URI'));
-    
     const basePath = getBasePathFromRequest(req);
-    console.log('計算出的 basePath:', basePath);
-    
-    // 構建 base URL 用於調試
-    const testBaseUrl = buildBaseUrl(req, basePath);
-    console.log('構建的 baseUrl:', testBaseUrl);
     
     // 檢測 Line 預覽
     const userAgent = req.get('User-Agent') || '';
