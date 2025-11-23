@@ -169,7 +169,10 @@ function initWebSocket() {
         console.log('✅ WebSocket 已連接，Socket ID:', socket.id);
         console.log('✅ 傳輸方式:', socket.io.engine.transport.name);
         document.getElementById('statusText').textContent = '已連接';
-        document.querySelector('.status-dot').style.background = '#28a745';
+        const statusDot = document.querySelector('.status-dot');
+        statusDot.style.background = '#28a745';
+        statusDot.classList.add('connected');
+        statusDot.classList.remove('disconnected');
         
         // 加入聊天室
         socket.emit('join-chat', { roomId, participantId });
@@ -190,7 +193,10 @@ function initWebSocket() {
     socket.on('disconnect', (reason) => {
         console.log('⚠️ WebSocket 斷線:', reason);
         document.getElementById('statusText').textContent = '已斷線';
-        document.querySelector('.status-dot').style.background = '#dc3545';
+        const statusDot = document.querySelector('.status-dot');
+        statusDot.style.background = '#dc3545';
+        statusDot.classList.add('disconnected');
+        statusDot.classList.remove('connected');
     });
     
     socket.on('reconnect_attempt', () => {
@@ -202,7 +208,8 @@ function initWebSocket() {
     });
     
     socket.on('joined', () => {
-        document.getElementById('sendBtn').disabled = false;
+        // 不直接啟用按鈕，讓輸入框監聽器根據內容決定
+        // 按鈕狀態由輸入框內容決定
     });
     
     socket.on('new-message', async ({ encryptedAESKey, encryptedMessage, timestamp }) => {
@@ -242,14 +249,43 @@ function initInput() {
     const input = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
     
+    // 根據輸入內容更新按鈕狀態
+    function updateSendButton() {
+        const hasText = input.value.trim().length > 0;
+        sendBtn.disabled = !hasText;
+    }
+    
+    // 自動調整輸入框高度
+    function autoResizeTextarea() {
+        // 重置高度以獲取正確的 scrollHeight
+        input.style.height = 'auto';
+        // 設置新高度，但不超過 max-height
+        const newHeight = Math.min(input.scrollHeight, 120);
+        input.style.height = newHeight + 'px';
+    }
+    
+    // 監聽輸入變化
+    input.addEventListener('input', () => {
+        updateSendButton();
+        autoResizeTextarea();
+    });
+    
     sendBtn.addEventListener('click', sendMessage);
     
     input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        // Ctrl+Enter 或 Cmd+Enter 發送訊息
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
-            sendMessage();
+            if (!sendBtn.disabled) {
+                sendMessage();
+            }
         }
+        // Enter 鍵預設為換行（不阻止默認行為）
     });
+    
+    // 初始化按鈕狀態和輸入框高度
+    updateSendButton();
+    autoResizeTextarea();
 }
 
 async function sendMessage() {
@@ -283,6 +319,13 @@ async function sendMessage() {
         
         // 清空輸入框
         input.value = '';
+        // 重置輸入框高度
+        input.style.height = 'auto';
+        // 更新按鈕狀態（變回灰色）
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.disabled = true;
+        // 將焦點設回輸入框
+        input.focus();
         
     } catch (error) {
         console.error('發送失敗:', error);
@@ -292,6 +335,9 @@ async function sendMessage() {
 
 function addMessage(text, isSelf, timestamp) {
     const container = document.getElementById('messagesContainer');
+    const messageWrapper = document.createElement('div');
+    messageWrapper.className = `message-wrapper ${isSelf ? 'message-self' : 'message-other'}`;
+    
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isSelf ? 'message-self' : 'message-other'}`;
     
@@ -307,8 +353,9 @@ function addMessage(text, isSelf, timestamp) {
     });
     
     messageDiv.appendChild(textDiv);
-    messageDiv.appendChild(timeDiv);
-    container.appendChild(messageDiv);
+    messageWrapper.appendChild(messageDiv);
+    messageWrapper.appendChild(timeDiv);
+    container.appendChild(messageWrapper);
     
     // 滾動到底部
     container.scrollTop = container.scrollHeight;
