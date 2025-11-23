@@ -151,7 +151,34 @@ app.get('/:roomId', (req, res) => {
     }
     
     if (!rooms.has(roomId)) {
-        return res.status(404).send('房間不存在或已過期');
+        // 返回錯誤頁面 HTML（使用白色卡片風格）
+        return res.status(404).send(`
+            <!DOCTYPE html>
+            <html lang="zh-TW">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>TinySecret - 房間不存在或已過期</title>
+                <link rel="stylesheet" href="${req.baseUrl || ''}/styles.css">
+            </head>
+            <body>
+                <div class="container">
+                    <div class="hero">
+                        <h1>🔒 TinySecret</h1>
+                    </div>
+                    <div class="card" style="text-align: center;">
+                        <h2 style="color: #00b900; margin-bottom: 20px;">房間不存在或已過期</h2>
+                        <p class="description">無法加入聊天室</p>
+                        <div class="status-box error">
+                            <div class="status-icon">❌</div>
+                            <h3>房間不存在或已過期</h3>
+                        </div>
+                        <button class="btn-primary" onclick="window.location.href = window.location.origin + '${req.baseUrl || ''}'" style="margin-top: 30px;">返回首頁</button>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
     }
     
     res.sendFile(path.join(__dirname, 'public', 'room.html'));
@@ -184,7 +211,34 @@ app.get('/:roomId/:participantId', (req, res) => {
     }
     
     if (!rooms.has(roomId)) {
-        return res.status(404).send('房間不存在或已過期');
+        // 返回錯誤頁面 HTML（使用白色卡片風格）
+        return res.status(404).send(`
+            <!DOCTYPE html>
+            <html lang="zh-TW">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>TinySecret - 房間不存在或已過期</title>
+                <link rel="stylesheet" href="${req.baseUrl || ''}/styles.css">
+            </head>
+            <body>
+                <div class="container">
+                    <div class="hero">
+                        <h1>🔒 TinySecret</h1>
+                    </div>
+                    <div class="card" style="text-align: center;">
+                        <h2 style="color: #00b900; margin-bottom: 20px;">房間不存在或已過期</h2>
+                        <p class="description">無法開啟聊天</p>
+                        <div class="status-box error">
+                            <div class="status-icon">❌</div>
+                            <h3>房間不存在或已過期</h3>
+                        </div>
+                        <button class="btn-primary" onclick="window.location.href = window.location.origin + '${req.baseUrl || ''}'" style="margin-top: 30px;">返回首頁</button>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
     }
     
     res.sendFile(path.join(__dirname, 'public', 'chat.html'));

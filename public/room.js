@@ -51,15 +51,25 @@ async function initCreator() {
     document.getElementById('roomUrl').value = roomUrl;
     
     // 複製按鈕
+    let copyTimeout = null;
     document.getElementById('copyBtn').addEventListener('click', () => {
         const input = document.getElementById('roomUrl');
         input.select();
         document.execCommand('copy');
         
         const btn = document.getElementById('copyBtn');
-        btn.textContent = '✓ 已複製';
-        setTimeout(() => {
+        
+        // 清除之前的 timeout（如果有的話）
+        if (copyTimeout) {
+            clearTimeout(copyTimeout);
+        }
+        
+        btn.textContent = '已複製！';
+        btn.classList.add('copied');
+        copyTimeout = setTimeout(() => {
             btn.textContent = '複製';
+            btn.classList.remove('copied');
+            copyTimeout = null;
         }, 2000);
     });
     
@@ -74,6 +84,16 @@ async function initParticipant() {
         document.getElementById('statusText').textContent = '獲取房間資訊...';
         
         const response = await fetch(`${window.location.origin}${basePath}api/room/${roomId}/creator-key`);
+        
+        if (!response.ok) {
+            if (response.status === 404) {
+                const errorText = await response.text();
+                showErrorPage('房間不存在或已過期', errorText || '無法加入聊天室');
+                return;
+            }
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const { publicKey: creatorPublicKeyBase64 } = await response.json();
         const creatorPublicKey = await CryptoHelper.importPublicKey(creatorPublicKeyBase64);
         
@@ -107,6 +127,15 @@ async function initParticipant() {
             })
         });
         
+        if (!joinResponse.ok) {
+            if (joinResponse.status === 404) {
+                const errorText = await joinResponse.text();
+                showErrorPage('房間不存在或已過期', errorText || '無法加入聊天室');
+                return;
+            }
+            throw new Error(`HTTP ${joinResponse.status}: ${joinResponse.statusText}`);
+        }
+        
         const { participantId, chatRoomUrl } = await joinResponse.json();
         
         // 5. 儲存金鑰和對方公鑰
@@ -121,8 +150,40 @@ async function initParticipant() {
         
     } catch (error) {
         console.error('加入房間失敗:', error);
-        document.getElementById('statusText').textContent = '加入失敗: ' + error.message;
+        // 顯示錯誤頁面（使用白色卡片風格）
+        showErrorPage('房間不存在或已過期', '無法加入聊天室');
     }
+}
+
+function showErrorPage(title, description) {
+    const basePath = getBasePath();
+    document.body.innerHTML = `
+        <!DOCTYPE html>
+        <html lang="zh-TW">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>TinySecret - ${title}</title>
+            <link rel="stylesheet" href="${basePath}styles.css">
+        </head>
+        <body>
+            <div class="container">
+                <div class="hero">
+                    <h1>🔒 TinySecret</h1>
+                </div>
+                <div class="card" style="text-align: center;">
+                    <h2 style="color: #00b900; margin-bottom: 20px;">${title}</h2>
+                    <p class="description">${description}</p>
+                    <div class="status-box error">
+                        <div class="status-icon">❌</div>
+                        <h3>${title}</h3>
+                    </div>
+                    <button class="btn-primary" onclick="window.location.href = window.location.origin + '${basePath.replace(/\/$/, '')}'" style="margin-top: 30px;">返回首頁</button>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
 }
 
 // 等待 DOM 載入完成

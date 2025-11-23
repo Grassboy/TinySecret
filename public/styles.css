@@ -6,7 +6,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
     min-height: 100vh;
     padding: 20px;
     color: #333;
@@ -20,7 +20,6 @@ body {
 .hero {
     text-align: center;
     color: white;
-    margin-bottom: 40px;
     padding: 40px 20px;
 }
 
@@ -102,6 +101,7 @@ body.chat-page {
     display: flex;
     align-items: center;
     gap: 12px;
+    justify-content: space-between;
 }
 
 .chat-header h1 {
@@ -133,6 +133,50 @@ body.chat-page {
     align-items: center;
     gap: 8px;
     margin: 0;
+    flex: 1;
+}
+
+.exit-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    color: white;
+}
+
+.exit-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.05);
+}
+
+.exit-btn:active {
+    transform: scale(0.95);
+}
+
+.exit-btn svg {
+    width: 24px;
+    height: 24px;
+    fill: white;
+    flex-shrink: 0;
+}
+
+.exit-btn .exit-text {
+    font-size: 0.9em;
+    white-space: nowrap;
+    display: none;
+}
+
+/* 在寬度超過 800px 時顯示文字 */
+@media (min-width: 801px) {
+    .exit-btn .exit-text {
+        display: inline-block;
+    }
 }
 
 .status-dot {
@@ -361,7 +405,7 @@ body.chat-page {
 }
 
 .card h2 {
-    color: #667eea;
+    color: #00b900;
     margin-bottom: 20px;
     font-size: 1.5em;
 }
@@ -382,7 +426,7 @@ body.chat-page {
 }
 
 .btn-encrypt {
-    background: #667eea;
+    background: #00b900;
     color: white;
     border: none;
     padding: 10px 20px;
@@ -395,9 +439,9 @@ body.chat-page {
 }
 
 .btn-encrypt:hover {
-    background: #5568d3;
+    background: #00a000;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 185, 0, 0.4);
 }
 
 .btn-encrypt:disabled {
@@ -414,7 +458,7 @@ body.chat-page {
 .section-label {
     display: block;
     margin-bottom: 15px;
-    color: #667eea;
+    color: #00b900;
     font-weight: 600;
     font-size: 1.1em;
 }
@@ -430,7 +474,7 @@ body.chat-page {
 }
 
 .step-number {
-    background: #667eea;
+    background: #00b900;
     color: white;
     width: 40px;
     height: 40px;
@@ -455,7 +499,7 @@ body.chat-page {
 }
 
 .btn-primary {
-    background: #667eea;
+    background: #00b900;
     color: white;
     border: none;
     padding: 15px 40px;
@@ -468,9 +512,9 @@ body.chat-page {
 }
 
 .btn-primary:hover {
-    background: #5568d3;
+    background: #00a000;
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 5px 15px rgba(0, 185, 0, 0.4);
 }
 
 .btn-primary:disabled {
@@ -494,6 +538,37 @@ body.chat-page {
     background: #e0e0e0;
 }
 
+.btn-copy {
+    background: #00b900;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: 500;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.btn-copy:hover {
+    background: #00a000;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 185, 0, 0.3);
+}
+
+.btn-copy:active {
+    transform: translateY(0);
+}
+
+.btn-copy.copied {
+    background: #28a745;
+}
+
+.btn-copy.copied:hover {
+    background: #218838;
+}
+
 .features {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -515,7 +590,7 @@ body.chat-page {
 }
 
 .feature h3 {
-    color: #667eea;
+    color: #00b900;
     margin-bottom: 10px;
 }
 
@@ -594,22 +669,22 @@ body.chat-page {
 }
 
 .participant-item:hover {
-    border-color: #667eea;
-    background: #f0f4ff;
+    border-color: #00b900;
+    background: #f0f9f0;
     transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 185, 0, 0.2);
 }
 
 .participant-item.selected {
-    border-color: #667eea;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    border-color: #00b900;
+    background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
+    box-shadow: 0 4px 15px rgba(0, 185, 0, 0.4);
     transform: translateY(-3px) scale(1.05);
 }
 
 .participant-item.selected .participant-avatar {
     background: white;
-    color: #667eea;
+    color: #00b900;
 }
 
 .participant-item.selected .participant-id {
@@ -619,7 +694,7 @@ body.chat-page {
 .participant-avatar {
     width: 50px;
     height: 50px;
-    background: #667eea;
+    background: #00b900;
     color: white;
     border-radius: 50%;
     display: flex;
@@ -670,7 +745,7 @@ body.chat-page {
 
 .form-control:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #00b900;
 }
 
 select.form-control {
@@ -692,7 +767,7 @@ textarea.form-control {
 .user-id {
     flex: 1;
     padding: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
     color: white;
     font-family: 'Courier New', monospace;
     font-size: 1.5em;
@@ -759,22 +834,22 @@ textarea.form-control {
 .countdown-hint {
     margin-top: 20px;
     font-size: 1.1em;
-    color: #667eea;
+    color: #00b900;
     font-weight: 600;
 }
 
 .countdown-hint span {
     font-size: 1.5em;
-    color: #667eea;
+    color: #00b900;
     font-weight: bold;
 }
 
 .selected-user-info {
     padding: 15px;
-    background: #f0f4ff;
+    background: #f0f9f0;
     border-radius: 8px;
     margin-bottom: 20px;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #00b900;
 }
 
 .selected-user-info p {
@@ -783,7 +858,7 @@ textarea.form-control {
 }
 
 .selected-user-info strong {
-    color: #667eea;
+    color: #00b900;
     font-family: 'Courier New', monospace;
     font-size: 1.1em;
 }

@@ -62,14 +62,34 @@ async function init() {
         const isParticipant = participantRole === 'participant';
         
         if (!isCreator && !isParticipant) {
-            // 顯示錯誤訊息
+            // 顯示錯誤訊息（使用白色卡片風格，比照 room.html 的風格）
+            const basePath = getBasePath();
             document.body.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
-                    <div style="text-align: center;">
-                        <h2>❌ 無權訪問</h2>
-                        <p style="color: #666;">您不是開啟房間的人，也不是受邀的對象，無法開啟聊天</p>
+                <!DOCTYPE html>
+                <html lang="zh-TW">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>TinySecret - 無權訪問</title>
+                    <link rel="stylesheet" href="${basePath}styles.css">
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="hero">
+                            <h1>🔒 TinySecret</h1>
+                        </div>
+                        <div class="card" style="text-align: center;">
+                            <h2 style="color: #00b900; margin-bottom: 20px;">無權訪問</h2>
+                            <p class="description">您不是開啟房間的人，也不是受邀的對象，無法開啟聊天</p>
+                            <div class="status-box error">
+                                <div class="status-icon">❌</div>
+                                <h3>無法開啟聊天</h3>
+                            </div>
+                            <button class="btn-primary" onclick="window.location.href = window.location.origin + '${basePath.replace(/\/$/, '')}'" style="margin-top: 30px;">返回首頁</button>
+                        </div>
                     </div>
-                </div>
+                </body>
+                </html>
             `;
             return;
         }
@@ -85,6 +105,9 @@ async function init() {
         
         // 初始化輸入
         initInput();
+        
+        // 初始化離開按鈕
+        initExitButton();
         
     } catch (error) {
         console.error('初始化失敗:', error);
@@ -238,6 +261,8 @@ function initWebSocket() {
         }
     }
     
+    let copyTimeout = null;
+    
     function showOfflineNotice() {
         // 如果已經顯示，就不重複創建
         if (offlineNoticeElement && offlineNoticeElement.parentNode) {
@@ -276,23 +301,25 @@ function initWebSocket() {
         
         // 複製按鈕
         const copyBtn = document.createElement('button');
+        copyBtn.className = 'btn-copy';
         copyBtn.textContent = '複製';
-        copyBtn.style.padding = '8px 16px';
-        copyBtn.style.borderRadius = '4px';
-        copyBtn.style.border = 'none';
-        copyBtn.style.backgroundColor = '#0073e6';
-        copyBtn.style.color = 'white';
-        copyBtn.style.cursor = 'pointer';
         copyBtn.onclick = () => {
             input.select();
             document.execCommand('copy');
+            
+            // 清除之前的 timeout（如果有的話）
+            if (copyTimeout) {
+                clearTimeout(copyTimeout);
+            }
+            
             // 短暫顯示複製成功提示
-            const originalText = copyBtn.textContent;
+            const originalText = '複製';
             copyBtn.textContent = '已複製！';
-            copyBtn.style.backgroundColor = '#28a745';
-            setTimeout(() => {
+            copyBtn.classList.add('copied');
+            copyTimeout = setTimeout(() => {
                 copyBtn.textContent = originalText;
-                copyBtn.style.backgroundColor = '#0073e6';
+                copyBtn.classList.remove('copied');
+                copyTimeout = null;
             }, 2000);
         };
         linkContainer.appendChild(copyBtn);
@@ -566,6 +593,18 @@ function showError(message) {
     errorDiv.className = 'system-message error';
     errorDiv.textContent = '❌ ' + message;
     container.appendChild(errorDiv);
+}
+
+function initExitButton() {
+    const exitBtn = document.getElementById('exitBtn');
+    if (exitBtn) {
+        exitBtn.addEventListener('click', () => {
+            // 獲取 base path
+            const basePath = getBasePath();
+            // 跳轉到首頁
+            window.location.href = window.location.origin + basePath.replace(/\/$/, '');
+        });
+    }
 }
 
 // 等待 DOM 載入完成
