@@ -165,7 +165,18 @@ main() {
     print_info "開始重新載入 TinySecret..."
     echo ""
     
-    # 檢查 Node.js 和 npm
+    # 確保使用系統安裝的 node/npm，不使用 nvm
+    # 清除可能的 nvm 環境變數（如果存在）
+    unset NVM_DIR
+    unset NVM_CD_FLAGS
+    unset NVM_BIN
+    unset NVM_INC
+    
+    # 確保 PATH 中優先使用系統安裝的 node/npm
+    # 移除可能的 nvm 路徑
+    export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v "$HOME/.nvm" | tr '\n' ':' | sed 's/:$//')
+    
+    # 檢查 Node.js 和 npm（確保使用系統安裝的版本）
     if ! command_exists node; then
         print_error "Node.js 未安裝，請先執行 ./install.sh"
         exit 1
@@ -174,6 +185,19 @@ main() {
     if ! command_exists npm; then
         print_error "npm 未安裝，請先執行 ./install.sh"
         exit 1
+    fi
+    
+    # 驗證 node 和 npm 版本（確保是系統安裝的版本）
+    NODE_VERSION=$(node --version)
+    NPM_VERSION=$(npm --version)
+    NODE_PATH=$(which node)
+    print_info "使用 Node.js: $NODE_VERSION, npm: $NPM_VERSION"
+    print_info "Node.js 路徑: $NODE_PATH"
+    
+    # 檢查是否在使用 nvm 管理的 node（如果是，給出警告）
+    if echo "$NODE_PATH" | grep -q "\.nvm"; then
+        print_warning "檢測到使用 nvm 管理的 Node.js"
+        print_warning "建議使用系統安裝的 Node.js，請先執行 ./install.sh"
     fi
     
     # 檢查 git
