@@ -799,11 +799,19 @@ function addFileMessage(file, isSelf, timestamp, isUploading = false) {
     if (isImageFile(file.name) && !isUploading) {
         // 圖片直接顯示
         const img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
+        const objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
         img.className = 'message-file-image';
+        img.dataset.imageSrc = objectUrl; // 保存原始 URL 用於全屏查看
+        img.dataset.fileName = file.name; // 保存文件名用於下載
+        img.style.cursor = 'pointer'; // 添加指針樣式
         img.onload = () => {
-            URL.revokeObjectURL(img.src);
+            // 不立即 revoke，因為可能需要用於全屏查看和下載
         };
+        // 添加點擊事件，顯示全屏查看器
+        img.addEventListener('click', () => {
+            showImageViewer(objectUrl, file.name);
+        });
         messageDiv.appendChild(img);
     } else {
         // 非圖片或上傳中：顯示文件名和大小
@@ -865,11 +873,16 @@ function updateFileMessageToImage(messageWrapper, file) {
     
     // 創建圖片元素
     const img = document.createElement('img');
-    img.src = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(file);
+    img.src = objectUrl;
     img.className = 'message-file-image';
-    img.onload = () => {
-        URL.revokeObjectURL(img.src);
-    };
+    img.dataset.imageSrc = objectUrl; // 保存原始 URL 用於全屏查看
+    img.dataset.fileName = file.name; // 保存文件名用於下載
+    img.style.cursor = 'pointer'; // 添加指針樣式
+    // 添加點擊事件，顯示全屏查看器
+    img.addEventListener('click', () => {
+        showImageViewer(objectUrl, file.name);
+    });
     messageDiv.appendChild(img);
 }
 
@@ -910,8 +923,18 @@ function addFileMessageFromBase64(fileInfo, fileBase64, isSelf, timestamp) {
     if (fileInfo.isImage) {
         // 圖片直接顯示
         const img = document.createElement('img');
-        img.src = 'data:' + fileInfo.fileType + ';base64,' + fileBase64;
+        const imageSrc = 'data:' + fileInfo.fileType + ';base64,' + fileBase64;
+        img.src = imageSrc;
         img.className = 'message-file-image';
+        img.dataset.imageSrc = imageSrc; // 保存原始 URL 用於全屏查看
+        img.dataset.fileName = fileInfo.fileName; // 保存文件名用於下載
+        img.dataset.fileBase64 = fileBase64; // 保存 base64 用於下載
+        img.dataset.fileType = fileInfo.fileType; // 保存文件類型用於下載
+        img.style.cursor = 'pointer'; // 添加指針樣式
+        // 添加點擊事件，顯示全屏查看器
+        img.addEventListener('click', () => {
+            showImageViewer(imageSrc, fileInfo.fileName, fileBase64, fileInfo.fileType);
+        });
         messageDiv.appendChild(img);
     } else {
         // 非圖片：顯示文件名和大小，提供下載
@@ -992,6 +1015,84 @@ function handleFileChunk(fileMessage) {
         
         // 清理緩存
         pendingFileChunks.delete(fileId);
+    }
+}
+
+// 顯示全屏圖片查看器
+function showImageViewer(imageSrc, fileName, fileBase64 = null, fileType = null) {
+    const viewer = document.getElementById('imageViewer');
+    const img = document.getElementById('imageViewerImg');
+    const downloadBtn = document.getElementById('imageViewerDownload');
+    const closeBtn = document.getElementById('imageViewerClose');
+    
+    if (!viewer || !img) return;
+    
+    // 設置圖片源
+    img.src = imageSrc;
+    img.alt = fileName;
+    
+    // 設置下載功能
+    downloadBtn.onclick = () => {
+        if (fileBase64 && fileType) {
+            // 從 base64 下載
+            const link = document.createElement('a');
+            link.href = 'data:' + fileType + ';base64,' + fileBase64;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            // 從 URL 下載（Blob URL）
+            fetch(imageSrc)
+                .then(res => res.blob())
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => {
+                    console.error('下載失敗:', err);
+                    showError('下載失敗');
+                });
+        }
+    };
+    
+    // 關閉按鈕
+    closeBtn.onclick = () => {
+        hideImageViewer();
+    };
+    
+    // 點擊背景關閉
+    const backdrop = viewer.querySelector('.image-viewer-backdrop');
+    backdrop.onclick = () => {
+        hideImageViewer();
+    };
+    
+    // ESC 鍵關閉
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            hideImageViewer();
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+    
+    // 顯示查看器
+    viewer.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 防止背景滾動
+}
+
+// 隱藏全屏圖片查看器
+function hideImageViewer() {
+    const viewer = document.getElementById('imageViewer');
+    if (viewer) {
+        viewer.style.display = 'none';
+        document.body.style.overflow = ''; // 恢復背景滾動
     }
 }
 

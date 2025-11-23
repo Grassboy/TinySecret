@@ -80,6 +80,23 @@
             </button>
         </div>
     </div>
+
+    <!-- 全屏圖片查看器 -->
+    <div id="imageViewer" class="image-viewer" style="display: none;">
+        <div class="image-viewer-backdrop"></div>
+        <div class="image-viewer-content">
+            <button id="imageViewerClose" class="image-viewer-close" title="關閉">×</button>
+            <img id="imageViewerImg" class="image-viewer-img" src="" alt="">
+            <div class="image-viewer-actions">
+                <button id="imageViewerDownload" class="image-viewer-download" title="下載圖片">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="white" width="20" height="20">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                    </svg>
+                    <span>下載</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 
