@@ -62,6 +62,61 @@ check_npm() {
     fi
 }
 
+# 檢查並配置 shell 配置文件
+setup_shell_config() {
+    local shell_config=""
+    
+    # 檢測當前使用的 shell
+    if [ -n "$ZSH_VERSION" ]; then
+        shell_config="$HOME/.zshrc"
+    elif [ -n "$BASH_VERSION" ]; then
+        shell_config="$HOME/.bashrc"
+    else
+        # 嘗試檢測默認 shell
+        if [ -f "$HOME/.zshrc" ]; then
+            shell_config="$HOME/.zshrc"
+        elif [ -f "$HOME/.bashrc" ]; then
+            shell_config="$HOME/.bashrc"
+        elif [ -f "$HOME/.bash_profile" ]; then
+            shell_config="$HOME/.bash_profile"
+        fi
+    fi
+    
+    if [ -z "$shell_config" ]; then
+        print_warning "無法檢測 shell 配置文件，請手動將以下內容添加到您的 shell 配置文件中："
+        echo ""
+        echo "export NVM_DIR=\"\$HOME/.nvm\""
+        echo "[ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\""
+        echo "[ -s \"\$NVM_DIR/bash_completion\" ] && \. \"\$NVM_DIR/bash_completion\""
+        return 1
+    fi
+    
+    # 檢查是否已經配置了 nvm
+    if grep -q "NVM_DIR" "$shell_config" 2>/dev/null; then
+        print_info "nvm 配置已存在於 $shell_config"
+    else
+        # 添加 nvm 配置到 shell 配置文件
+        print_info "將 nvm 配置添加到 $shell_config..."
+        {
+            echo ""
+            echo "# NVM Configuration (added by TinySecret install.sh)"
+            echo "export NVM_DIR=\"\$HOME/.nvm\""
+            echo "[ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\""
+            echo "[ -s \"\$NVM_DIR/bash_completion\" ] && \. \"\$NVM_DIR/bash_completion\""
+        } >> "$shell_config"
+        
+        print_success "已將 nvm 配置添加到 $shell_config"
+    fi
+    
+    # 立即載入 nvm 配置，讓當前 shell 也能使用
+    print_info "載入 nvm 配置到當前 shell..."
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    
+    return 0
+}
+
 # 安裝 Node.js 和 npm（使用 nvm）
 install_node_with_nvm() {
     print_info "嘗試使用 nvm 安裝 Node.js..."
@@ -77,6 +132,10 @@ install_node_with_nvm() {
             nvm install --lts
             nvm use --lts
             nvm alias default node
+            
+            # 配置 shell 配置文件
+            setup_shell_config
+            
             return 0
         fi
     fi
@@ -94,6 +153,10 @@ install_node_with_nvm() {
             nvm install --lts
             nvm use --lts
             nvm alias default node
+            
+            # 配置 shell 配置文件
+            setup_shell_config
+            
             return 0
         fi
     elif command_exists wget; then
@@ -106,6 +169,10 @@ install_node_with_nvm() {
             nvm install --lts
             nvm use --lts
             nvm alias default node
+            
+            # 配置 shell 配置文件並載入到當前 shell
+            setup_shell_config
+            
             return 0
         fi
     fi
@@ -197,6 +264,31 @@ main() {
     echo ""
     print_success "安裝完成！"
     echo ""
+    
+    # 如果使用 nvm，確保當前 shell 已載入 nvm
+    if [ -s "$HOME/.nvm/nvm.sh" ]; then
+        # 再次確保 nvm 已載入
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        
+        # 驗證 node 和 npm 是否可用
+        if command_exists node && command_exists npm; then
+            print_success "node 和 npm 已在當前 shell 中可用"
+            NODE_VERSION=$(node --version)
+            NPM_VERSION=$(npm --version)
+            print_info "Node.js: $NODE_VERSION, npm: $NPM_VERSION"
+        else
+            print_warning "node 或 npm 在當前 shell 中不可用，請重新載入 shell 配置："
+            if [ -f "$HOME/.zshrc" ]; then
+                echo "  source ~/.zshrc"
+            else
+                echo "  source ~/.bashrc"
+            fi
+            exit 1
+        fi
+        echo ""
+    fi
+    
     print_info "啟動服務器..."
     echo ""
     
