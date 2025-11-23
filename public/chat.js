@@ -64,32 +64,23 @@ async function init() {
         if (!isCreator && !isParticipant) {
             // 顯示錯誤訊息（使用白色卡片風格，比照 room.html 的風格）
             const basePath = getBasePath();
+            // 移除 chat-page class，恢復正常的 body padding
+            document.body.className = '';
             document.body.innerHTML = `
-                <!DOCTYPE html>
-                <html lang="zh-TW">
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>TinySecret - 無權訪問</title>
-                    <link rel="stylesheet" href="${basePath}styles.css">
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="hero">
-                            <h1>🔒 TinySecret</h1>
-                        </div>
-                        <div class="card" style="text-align: center;">
-                            <h2 style="color: #00b900; margin-bottom: 20px;">無權訪問</h2>
-                            <p class="description">您不是開啟房間的人，也不是受邀的對象，無法開啟聊天</p>
-                            <div class="status-box error">
-                                <div class="status-icon">❌</div>
-                                <h3>無法開啟聊天</h3>
-                            </div>
-                            <button class="btn-primary" onclick="window.location.href = window.location.origin + '${basePath.replace(/\/$/, '')}'" style="margin-top: 30px;">返回首頁</button>
-                        </div>
+                <div class="container">
+                    <div class="hero">
+                        <h1>🔒 TinySecret</h1>
                     </div>
-                </body>
-                </html>
+                    <div class="card" style="text-align: center;">
+                        <h2 style="color: #00b900; margin-bottom: 20px;">無權訪問</h2>
+                        <p class="description">您不是開啟房間的人，也不是受邀的對象，無法開啟聊天</p>
+                        <div class="status-box error">
+                            <div class="status-icon">❌</div>
+                            <h3>無法開啟聊天</h3>
+                        </div>
+                        <button class="btn-primary" onclick="window.location.href = window.location.origin + '${basePath.replace(/\/$/, '')}'" style="margin-top: 30px;">返回首頁</button>
+                    </div>
+                </div>
             `;
             return;
         }
