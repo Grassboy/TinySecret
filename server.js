@@ -28,119 +28,14 @@ const rooms = new Map();
 
 const ROOM_TIMEOUT = 15 * 60 * 1000; // 15分鐘
 
-// 獲取 base path 的輔助函數（需要在 renderHtmlTemplate 之前定義）
-function getBasePathFromRequest(req) {
-    // 嘗試從多個來源獲取完整路徑
-    // 1. 檢查 X-Forwarded-Path 或 X-Original-URI（Apache 可能設置）
-    const forwardedPath = req.get('X-Forwarded-Path') || req.get('X-Original-URI');
-    if (forwardedPath) {
-        const pathname = forwardedPath.split('?')[0];
-        const parts = pathname.split('/').filter(p => p);
-        const knownBasePaths = ['tinySecret'];
-        if (parts.length > 0 && knownBasePaths.includes(parts[0])) {
-            return '/' + parts[0] + '/';
-        }
-    }
-    
-    // 2. 檢查 Referer 頭（如果有的話）- 這是最可靠的方法
-    const referer = req.get('Referer');
-    if (referer) {
-        try {
-            const refererUrl = new URL(referer);
-            const refererPath = refererUrl.pathname;
-            const parts = refererPath.split('/').filter(p => p);
-            const knownBasePaths = ['tinySecret'];
-            if (parts.length > 0 && knownBasePaths.includes(parts[0])) {
-                return '/' + parts[0] + '/';
-            }
-        } catch (e) {
-            // 忽略解析錯誤
-        }
-    }
-    
-    // 3. 檢查 X-Forwarded-Host 和 Host 頭
-    const forwardedHost = req.get('X-Forwarded-Host');
-    const host = req.get('Host') || '';
-    const finalHost = forwardedHost || host || 'localhost:10359';
-    
-    // 判斷是否為本地開發環境
-    const isLocalhost = finalHost.includes('localhost') || finalHost.includes('127.0.0.1');
-    
-    // 如果不是 localhost，推斷使用 /tinySecret/ 子路徑
-    if (!isLocalhost) {
-        return '/tinySecret/';
-    }
-    
-    // 4. 使用 originalUrl（如果包含完整路徑）
-    const pathname = req.originalUrl ? req.originalUrl.split('?')[0] : (req.path || req.url.split('?')[0]);
-    const parts = pathname.split('/').filter(p => p);
-    const knownBasePaths = ['tinySecret'];
-    
-    if (parts.length > 0 && knownBasePaths.includes(parts[0])) {
-        return '/' + parts[0] + '/';
-    }
-    
-    // 5. 默認返回根路徑（本地開發）
-    return '/';
-}
-
-// 構建完整的 base URL（考慮反向代理）
-function buildBaseUrl(req, basePath) {
-    // 優先檢查 X-Forwarded-Host（Apache 代理設置）
-    const forwardedHost = req.get('X-Forwarded-Host');
-    const host = req.get('Host') || '';
-    const finalHost = forwardedHost || host || 'localhost:10359';
-    
-    // 判斷是否為本地開發環境
-    const isLocalhost = finalHost.includes('localhost') || finalHost.includes('127.0.0.1');
-    
-    // 如果不是 localhost，使用該 host 作為 baseUrl 的一部分
-    if (!isLocalhost) {
-        // 使用 X-Forwarded-Proto，如果沒有則默認使用 https（因為不是 localhost）
-        const protocol = req.get('X-Forwarded-Proto') || 'https';
-        return protocol + '://' + finalHost + basePath;
-    }
-    
-    // 本地開發環境：使用 http
-    const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'http';
-    return protocol + '://' + finalHost + basePath;
-}
-
-// 讀取並替換 HTML 模板中的占位符
-function renderHtmlTemplate(req, htmlFile, additionalReplacements = {}) {
-    const basePath = getBasePathFromRequest(req);
-    const baseUrl = buildBaseUrl(req, basePath);
-    
-    // 構建完整 URL（當前頁面的完整 URL）
-    const forwardedHost = req.get('X-Forwarded-Host');
-    const host = req.get('Host') || '';
-    const finalHost = forwardedHost || host || 'localhost:10359';
-    const isLocalhost = finalHost.includes('localhost') || finalHost.includes('127.0.0.1');
-    const protocol = isLocalhost 
-        ? (req.get('X-Forwarded-Proto') || req.protocol || 'http')
-        : (req.get('X-Forwarded-Proto') || 'https');
-    const currentPath = req.originalUrl || req.url;
-    const fullUrl = protocol + '://' + finalHost + currentPath;
-    
-    const htmlPath = path.join(__dirname, 'public', htmlFile);
-    let html = fs.readFileSync(htmlPath, 'utf8');
-    
-    // 替換占位符
-    html = html.replace(/\[BASE\]/g, baseUrl);
-    html = html.replace(/\[BASE_PATH\]/g, basePath);
-    html = html.replace(/\[FULL_URL\]/g, fullUrl);
-    
-    // 替換額外的占位符
-    Object.keys(additionalReplacements).forEach(key => {
-        html = html.replace(new RegExp(`\\[${key}\\]`, 'g'), additionalReplacements[key]);
-    });
-    
-    return html;
-}
-
 app.use(express.json());
 
-// API 路由（必須在 express.static 之前）
+// 首頁（必須在 express.static 之前）
+app.get('/', (req, res) => {
+    const html = renderHtmlTemplate(req, 'index.html');
+    res.send(html);
+});
+
 // 創建房間 API
 app.post('/api/create-room', (req, res) => {
     const { publicKey } = req.body;
@@ -230,13 +125,129 @@ app.get('/api/room/:roomId/participant/:participantId', (req, res) => {
     res.json(encryptedData);  // 返回 { encryptedAESKey, encryptedPublicKey }
 });
 
-// 首頁（必須在 express.static 之前）
-app.get('/', (req, res) => {
-    const html = renderHtmlTemplate(req, 'index.html');
-    res.send(html);
-});
+// 構建完整的 base URL（考慮反向代理）
+function buildBaseUrl(req, basePath) {
+    // 優先檢查 X-Forwarded-Host（Apache 代理設置）
+    const forwardedHost = req.get('X-Forwarded-Host');
+    const host = req.get('Host') || '';
+    const finalHost = forwardedHost || host || 'localhost:10359';
+    
+    // 判斷是否為本地開發環境
+    const isLocalhost = finalHost.includes('localhost') || finalHost.includes('127.0.0.1');
+    
+    // 如果不是 localhost，使用該 host 作為 baseUrl 的一部分
+    if (!isLocalhost) {
+        // 使用 X-Forwarded-Proto，如果沒有則默認使用 https（因為不是 localhost）
+        const protocol = req.get('X-Forwarded-Proto') || 'https';
+        return protocol + '://' + finalHost + basePath;
+    }
+    
+    // 本地開發環境：使用 http
+    const protocol = req.get('X-Forwarded-Proto') || req.protocol || 'http';
+    return protocol + '://' + finalHost + basePath;
+}
 
-// 房間頁面（必須在 express.static 之前）
+// 讀取並替換 HTML 模板中的占位符
+function renderHtmlTemplate(req, htmlFile, additionalReplacements = {}) {
+    const basePath = getBasePathFromRequest(req);
+    const baseUrl = buildBaseUrl(req, basePath);
+    
+    // 構建完整 URL（當前頁面的完整 URL）
+    const forwardedHost = req.get('X-Forwarded-Host');
+    const host = req.get('Host') || '';
+    const finalHost = forwardedHost || host || 'localhost:10359';
+    const isLocalhost = finalHost.includes('localhost') || finalHost.includes('127.0.0.1');
+    const protocol = isLocalhost 
+        ? (req.get('X-Forwarded-Proto') || req.protocol || 'http')
+        : (req.get('X-Forwarded-Proto') || 'https');
+    
+    // 獲取當前路徑
+    let currentPath = req.originalUrl || req.url;
+    
+    // 如果不是 localhost，且路徑中還沒有 tinySecret，則加上
+    if (!isLocalhost) {
+        const pathParts = currentPath.split('/').filter(p => p);
+        if (pathParts.length === 0 || pathParts[0] !== 'tinySecret') {
+            // 如果路徑不是以 /tinySecret 開頭，則加上
+            currentPath = '/tinySecret' + (currentPath.startsWith('/') ? currentPath : '/' + currentPath);
+        }
+    }
+    
+    const fullUrl = protocol + '://' + finalHost + currentPath;
+    
+    const htmlPath = path.join(__dirname, 'public', htmlFile);
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    
+    // 替換占位符
+    html = html.replace(/\[BASE\]/g, baseUrl);
+    html = html.replace(/\[BASE_PATH\]/g, basePath);
+    html = html.replace(/\[FULL_URL\]/g, fullUrl);
+    
+    // 替換額外的占位符
+    Object.keys(additionalReplacements).forEach(key => {
+        html = html.replace(new RegExp(`\\[${key}\\]`, 'g'), additionalReplacements[key]);
+    });
+    
+    return html;
+}
+
+// 獲取 base path 的輔助函數
+function getBasePathFromRequest(req) {
+    // 嘗試從多個來源獲取完整路徑
+    // 1. 檢查 X-Forwarded-Path 或 X-Original-URI（Apache 可能設置）
+    const forwardedPath = req.get('X-Forwarded-Path') || req.get('X-Original-URI');
+    if (forwardedPath) {
+        const pathname = forwardedPath.split('?')[0];
+        const parts = pathname.split('/').filter(p => p);
+        const knownBasePaths = ['tinySecret'];
+        if (parts.length > 0 && knownBasePaths.includes(parts[0])) {
+            return '/' + parts[0] + '/';
+        }
+    }
+    
+    // 2. 檢查 Referer 頭（如果有的話）- 這是最可靠的方法
+    const referer = req.get('Referer');
+    if (referer) {
+        try {
+            const refererUrl = new URL(referer);
+            const refererPath = refererUrl.pathname;
+            const parts = refererPath.split('/').filter(p => p);
+            const knownBasePaths = ['tinySecret'];
+            if (parts.length > 0 && knownBasePaths.includes(parts[0])) {
+                return '/' + parts[0] + '/';
+            }
+        } catch (e) {
+            // 忽略解析錯誤
+        }
+    }
+    
+    // 3. 檢查 X-Forwarded-Host 和 Host 頭
+    const forwardedHost = req.get('X-Forwarded-Host');
+    const host = req.get('Host') || '';
+    const finalHost = forwardedHost || host || 'localhost:10359';
+    
+    // 判斷是否為本地開發環境
+    const isLocalhost = finalHost.includes('localhost') || finalHost.includes('127.0.0.1');
+    
+    // 如果不是 localhost，推斷使用 /tinySecret/ 子路徑
+    if (!isLocalhost) {
+        return '/tinySecret/';
+    }
+    
+    // 4. 使用 originalUrl（如果包含完整路徑）
+    const pathname = req.originalUrl ? req.originalUrl.split('?')[0] : (req.path || req.url.split('?')[0]);
+    const parts = pathname.split('/').filter(p => p);
+    const knownBasePaths = ['tinySecret'];
+    
+    if (parts.length > 0 && knownBasePaths.includes(parts[0])) {
+        return '/' + parts[0] + '/';
+    }
+    
+    // 5. 默認返回根路徑（本地開發）
+    return '/';
+}
+
+// 房間頁面
 app.get('/:roomId', (req, res, next) => {
     const { roomId } = req.params;
     
@@ -313,7 +324,7 @@ app.get('/:roomId', (req, res, next) => {
     res.send(html);
 });
 
-// 聊天室頁面（必須在 express.static 之前）
+// 聊天室頁面
 app.get('/:roomId/:participantId', (req, res, next) => {
     const { roomId, participantId } = req.params;
     
@@ -390,7 +401,7 @@ app.get('/:roomId/:participantId', (req, res, next) => {
     res.send(html);
 });
 
-// 靜態文件中間件（放在路由之後，避免攔截 HTML 文件和 API）
+// 靜態文件中間件（放在路由之後，避免攔截 HTML 文件）
 app.use(express.static('public'));
 
 // WebSocket 連接
