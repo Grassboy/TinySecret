@@ -267,6 +267,8 @@ app.get('/:roomId', (req, res, next) => {
     const isLineBot = userAgent.toLowerCase().includes('line-poker');
     
     if (isLineBot) {
+        const baseUrl = buildBaseUrl(req, basePath);
+        const previewImageUrl = baseUrl + 'preview1.png';
         return res.send(`
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -275,6 +277,7 @@ app.get('/:roomId', (req, res, next) => {
     <title>TinySecret - 安全聊天室</title>
     <meta property="og:title" content="TinySecret - 安全聊天室">
     <meta property="og:description" content="端對端加密的即時聊天，伺服器無法解密你的訊息">
+    <meta property="og:image" content="${previewImageUrl}">
 </head>
 <body>
     <h1>TinySecret - 安全聊天室</h1>
@@ -344,6 +347,8 @@ app.get('/:roomId/:participantId', (req, res, next) => {
     const isLineBot = userAgent.toLowerCase().includes('line-poker');
     
     if (isLineBot) {
+        const baseUrl = buildBaseUrl(req, basePath);
+        const previewImageUrl = baseUrl + 'preview2.png';
         return res.send(`
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -352,6 +357,7 @@ app.get('/:roomId/:participantId', (req, res, next) => {
     <title>TinySecret - 加密聊天</title>
     <meta property="og:title" content="TinySecret - 加密聊天">
     <meta property="og:description" content="只有你和對方能解密的私密對話">
+    <meta property="og:image" content="${previewImageUrl}">
 </head>
 <body>
     <h1>TinySecret - 加密聊天</h1>
