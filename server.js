@@ -28,6 +28,18 @@ const rooms = new Map();
 
 const ROOM_TIMEOUT = 15 * 60 * 1000; // 15分鐘
 
+// 格式化時間為 YYYY-MM-DD HH:mm:ss
+function formatTimestamp() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 app.use(express.json());
 
 // 首頁（必須在 express.static 之前）
@@ -58,7 +70,7 @@ app.post('/api/create-room', (req, res) => {
     
     // 設置超時清理
     room.timeoutHandle = setTimeout(() => {
-        console.log(`房間 ${roomId} 已超時，自動清理`);
+        console.log(`[${formatTimestamp()}] 房間 ${roomId} 已超時，自動清理`);
         rooms.delete(roomId);
     }, ROOM_TIMEOUT);
     
@@ -412,7 +424,7 @@ app.use(express.static('public'));
 
 // WebSocket 連接
 io.on('connection', (socket) => {
-    console.log('Socket 連接:', socket.id);
+    console.log(`[${formatTimestamp()}] Socket 連接:`, socket.id);
     
     // 加入聊天室
     socket.on('join-chat', ({ roomId, participantId }) => {
@@ -471,7 +483,7 @@ io.on('connection', (socket) => {
     
     // 斷線
     socket.on('disconnect', () => {
-        console.log('Socket 斷線:', socket.id);
+        console.log(`[${formatTimestamp()}] Socket 斷線:`, socket.id);
         
         // 從房間中移除
         rooms.forEach((room, roomId) => {
@@ -496,12 +508,12 @@ function updateRoomActivity(roomId) {
     
     // 設置新的超時
     room.timeoutHandle = setTimeout(() => {
-        console.log(`房間 ${roomId} 已超時，自動清理`);
+        console.log(`[${formatTimestamp()}] 房間 ${roomId} 已超時，自動清理`);
         rooms.delete(roomId);
     }, ROOM_TIMEOUT);
 }
 
 const PORT = process.env.PORT || 10359;
 httpServer.listen(PORT, () => {
-    console.log(`TinySecret 伺服器運行在 http://localhost:${PORT}`);
+    console.log(`[${formatTimestamp()}] TinySecret 伺服器運行在 http://localhost:${PORT}`);
 });
