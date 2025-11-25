@@ -4,38 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TinySecret - 端對端加密聊天</title>
-    <script>
-        (function() {
-            // 動態計算 base path
-            var path = window.location.pathname;
-            // 移除末尾的斜線（如果有的話）
-            if (path.endsWith('/') && path !== '/') {
-                path = path.slice(0, -1);
-            }
-            // 確保 path 以 / 結尾（除了根路徑）
-            if (path !== '/') {
-                path = path + '/';
-            }
-            // 對於 /tinySecret/，base 就是 /tinySecret/
-            // 對於 /，base 就是 /
-            var base = window.location.origin + path;
-            var fullUrl = window.location.origin + window.location.pathname;
-            
-            // Facebook Open Graph 標籤
-            document.write('<meta property="og:type" content="website">');
-            document.write('<meta property="og:title" content="TinySecret - 端對端加密聊天">');
-            document.write('<meta property="og:description" content="TinySecret 是一個可以在完全公開的環境下，和您指定的對像進行一對一私密通訊的小工具！使用 RSA-2048 + AES-256 混合加密技術，伺服器零知識，15 分鐘自動過期。完全免費、無需註冊、即開即用！">');
-            document.write('<meta property="og:image" content="' + base + 'ogimage.jpg">');
-            document.write('<meta property="og:url" content="' + fullUrl + '">');
-            document.write('<meta property="og:site_name" content="TinySecret">');
-            document.write('<meta property="og:locale" content="zh_TW">');
-            
-            document.write('<base href="' + base + '">');
-            document.write('<link rel="icon" type="image/png" href="' + base + 'favicon.png">');
-            document.write('<link rel="stylesheet" href="' + base + 'styles.css">');
-            document.write('<script src="' + base + 'crypto.js"><\/script>');
-        })();
-    </script>
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="TinySecret - 端對端加密聊天">
+    <meta property="og:description" content="TinySecret 是一個可以在完全公開的環境下，和您指定的對像進行一對一私密通訊的小工具！使用 RSA-2048 + AES-256 混合加密技術，伺服器零知識，15 分鐘自動過期。完全免費、無需註冊、即開即用！">
+    <meta property="og:image" content="[BASE]ogimage.jpg">
+    <meta property="og:url" content="[FULL_URL]">
+    <meta property="og:site_name" content="TinySecret">
+    <meta property="og:locale" content="zh_TW">
+    <base href="[BASE]">
+    <link rel="icon" type="image/png" href="[BASE]favicon.png">
+    <link rel="stylesheet" href="[BASE]styles.css">
+    <script src="[BASE]crypto.js"></script>
 </head>
 <body>
     <div class="container">
